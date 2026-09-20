@@ -8,6 +8,7 @@
 #   - plexmediaserver, samba (smbd/nmbd), noip2, transmission, sshd  -> active
 #   - invoice docker containers -> Up
 #   - pihole container -> healthy, DNS answering locally
+#   - tvguard: consistent (active marker <=> table + 2 ufw route rules)
 #   - no accidental DHCP server on :67, no new NAT/forwarding rules
 #   - memory / disk free
 set -uo pipefail
@@ -46,6 +47,29 @@ if ss -lntup | awk '{print $5}' | grep -qE ':(67)$'; then
 else
     say "UDP :67 (DHCP) listener" "absent (good)"
 fi
+
+# --- TVGuard consistency (our own footprint only) ---
+echo
+echo "=== TVGuard (this project's firewall role) ==="
+if [ -f /var/lib/tvguard/active ]; then
+    if nft list table ip tvguard >/dev/null 2>&1; then
+        say "tvguard table" "present (active expected)"
+        # exactly our two TV route rules, nothing more in ufw-user-forward
+        n_tv_rules=$(sudo iptables -t filter -S ufw-user-forward 2>/dev/null | grep -c ' -j ACCEPT')
+        [ "$n_tv_rules" = "2" ] && say "ufw-user-forward TV rules" "2 (expected)" \
+            || { say "ufw-user-forward TV rules" "UNEXPECTED COUNT: $n_tv_rules"; fail=1; }
+    else
+        say "tvguard table" "MISSING but active marker set - run tvguard-enable-monitor.sh"; fail=1
+    fi
+else
+    if nft list table ip tvguard >/dev/null 2>&1; then
+        say "tvguard table" "present but no active marker - run tvguard-disable.sh (or enable-monitor)"
+    else
+        say "tvguard table" "absent (disabled - consistent)"
+    fi
+fi
+say "tvguard.service" "$(systemctl is-enabled tvguard.service 2>/dev/null || echo not-installed)"
+
 # No new forwarding/NAT: forwarding chain should be empty on the LAN-facing table
 # (Docker's own nat/forwarding for the invoice net is expected and pre-existing)
 echo "  current 'filter FORWARD' rules:"

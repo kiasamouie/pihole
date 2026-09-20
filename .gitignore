@@ -9,6 +9,12 @@ etc-pihole/
 reports/raw/*.pcap
 *.pcap
 
+# TVGuard session captures (runtime data, can be large)
+captures/
+
+# Machine-specific TVGuard config (committed template: config/tvguard.conf.example)
+config/tvguard.conf
+
 # Local scratch
 data/*.tmp
 .DS_Store

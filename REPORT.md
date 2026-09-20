@@ -27,9 +27,19 @@ Date: 2026-09-20 · Host: `kiaserver` (Debian 13) · Workdir: `/home/kia/dns`
 - **What Pi-hole can do**: log and block domains per device/group. **What it cannot**:
   see or stop traffic that never queries it (hard-coded IPs, DoH/DoT, direct
   connections), inspect encrypted payloads, or see voice transcripts.
-- **Staged rollout is ready**: `ROUTER_NEXT_STEPS.md` gives the exact Virgin Hub
-  sequence (reserve IP → 1 test client → 1 TV → observe 24 h → tune → wider).
-  `ROLLBACK.md` covers stopping/removing everything without touching Plex/backups.
+- **Staged rollout is ready**: `ROUTER_NEXT_STEPS_V2.md` gives the exact, minimal
+  manual sequence (reserve two IPs → Samsung gateway/DNS to `.128` → monitor tests).
+  `ROLLBACK.md` covers the one-command TVGuard firewall rollback plus Pi-hole
+  removal without touching Plex/backups.
+- **The full gateway/firewall PoC now exists on this machine and is proven**
+  (not deferred to the future box): one-arm IPv4 gateway (TV → this box → Hub),
+  SNAT/masquerade with return path through the box, a dedicated removable
+  `tvguard` nftables table in `monitor` mode, DNS-bypass transparent redirection
+  to Pi-hole, conntrack-based session recording + comparison tooling, and a
+  systemd-persisted, one-command-removable install. A mock-TV selftest passes
+  7/7 (DNS redirect attribution, HTTP/HTTPS egress, NAT return path). See
+  `reports/05-tvguard-gateway.md`. No real TV is pointed at it yet; the rules
+  are dormant until the Samsung's gateway/DNS is changed.
 
 ---
 
@@ -41,7 +51,7 @@ Date: 2026-09-20 · Host: `kiaserver` (Debian 13) · Workdir: `/home/kia/dns`
 | **B. DNS logging** | ✅ **Yes** | Same as above. Query log is in `etc-pihole/` (git-ignored). Rotate/cap is trivial. |
 | **C. LAN discovery** | ✅ **Yes** | arp-scan/nmap/avahi/tshark all installed; 12 devices inventoried (Section 8). |
 | **D. Traffic analysis** | ⚠️ **Partially** | Passive capture works for what reaches the NIC (broadcast/multicast/its own traffic). Full flow analysis (ntopng/Zeek) only becomes useful once the box is a gateway or receives mirrored traffic — see Section 11. |
-| **E. Temporary PoC firewall/router** | ⚠️ **Possible, not recommended** | One NIC means LAN and WAN share the interface (fine for a Virgin Hub in modem mode where the Hub is upstream), but any outage takes down *everything*, and Plex/Samba/backups die with it. Acceptable for a short, monitored experiment only. |
+| **E. Temporary PoC firewall/router** | ⚠️ **Proven, short-term only** | The one-arm gateway is now **built and selftest-verified on this box** (see `reports/05-tvguard-gateway.md`): single-interface forwarding + masquerade works, UFW/Docker coexist, rollback is one command. The risk stands: any outage of this box takes down Plex, backups **and** the TV egress control together. Acceptable as a monitored PoC; replace with the dedicated box before trusting it. |
 | **F. Permanent firewall/router** | ❌ **No** | Single NIC, Realtek 1GbE (not ideal for 24/7 routing), already hosts Plex + Samba + backups (SPOF for those), no redundancy. Use the dedicated box (Section 19). |
 | **G. Plex + backups + DNS together** | ✅ **Yes (as today)** | Resource headroom is large. The concern is operational (a Pi-hole upgrade shouldn't take down Plex), not capacity. Keeping them in separate failure domains (Docker container vs systemd) already holds. |
 
@@ -309,11 +319,11 @@ onto the box.
 | Layer | Mechanism | Status |
 |---|---|---|
 | 1 — DNS logging/filtering | Pi-hole, per-group allow/deny + gravity | **Done** (isolated) |
-| 2 — Forced DNS | Client DNS → Pi-hole; block outbound 53/853/DoH so it can't be bypassed | Rollout (Step 8) + later firewall |
-| 3 — Per-device egress firewall | Gateway allows/denies by `src device → dst : port` | Gateway phase |
-| 4 — TV/IoT isolation | Separate VLAN/subnet, stricter egress, no TV→trusted-LAN init | Gateway phase |
-| 5 — Monitoring | Pi-hole query log + tcpdump/tshark + conntrack (ntopng/Zeek later) | **Done** (passive) |
-| 6 — Evidence-based tuning | Block only domains *proven* telemetry per action (Section 15) | Methodology ready |
+| 2 — Forced DNS | TV DNS → Pi-hole; external :53 (udp/tcp) transparently redirected to Pi-hole by TVGuard (proven); DoT 853 block in enforce mode | **Done for selected TVs** (active once a TV uses the box as gateway) |
+| 3 — Per-device egress firewall | `tvguard` nftables table: per-TV allow/log/counter, enforce-mode drops from the evidence ledger | **Built + selftest-verified** (monitor live; enforce armed) |
+| 4 — TV/IoT isolation | Separate VLAN/subnet, stricter egress, no TV→trusted-LAN init | Gateway phase (dedicated box) — **not** provided by the one-arm PoC (L2 caveat) |
+| 5 — Monitoring | Pi-hole query log + conntrack session recorder + nft counters + tshark | **Done** (passive + per-session) |
+| 6 — Evidence-based tuning | Block only destinations *proven* telemetry per action (`config/destinations.yaml` + compare tool) | Methodology ready, tooling tested |
 
 ---
 
@@ -345,11 +355,20 @@ about encrypted content or connections that don't use it.
 ## 17. What requires a gateway / firewall
 
 - **Forcing** DNS (blocking egress UDP/TCP 53, 853, DoH to non-ours) so clients
-  actually *must* use Pi-hole.
+  actually *must* use Pi-hole. → **now implemented for the selected TVs** by
+  TVGuard (external :53 redirected, 853 blocked in enforce); network-wide
+  enforcement comes with the dedicated box.
 - **Per-device egress** allow/deny by IP:port (the real "stop TV → telemetry host").
-- **Network isolation** (TV/IoT VLAN; block TV→trusted-LAN init).
-- **IPv6** egress control (a common bypass: `AAAA`/DoH over v6).
-- **Visibility** of all unicast (needed before ntopng/Zeek pay off).
+  → **implemented (monitor live / enforce armed)** for the two TVs; the rest of
+  the LAN is structurally unaffected (source-IP-scoped rules).
+- **Network isolation** (TV/IoT VLAN; block TV→trusted-LAN init). → dedicated box phase.
+- **IPv6** egress control (a common bypass: `AAAA`/DoH over v6). → assessed: no
+  global IPv6 prefix is advertised on this connection (4-minute RA capture empty),
+  so there is currently no v6 bypass path; the pattern would mirror to `ip6` if
+  Virgin ever enables it.
+- **Visibility** of all unicast (needed before ntopng/Zeek pay off). → TV traffic
+  is now visible once routed through the box; whole-LAN visibility still needs
+  gateway/mirror (dedicated box).
 
 ## 18. What we can realistically determine about TV voice/transcript traffic
 
@@ -411,18 +430,44 @@ optional ntopng/Zeek + TV/IoT VLAN), **not** from a product:
 ## 20. What was NOT done (per your safety rules)
 
 - No Virgin Hub change, no DHCP enabled, no DNS redirection of any client, no
-  gateway/NAT/forwarding change, no LAN device blocked, no ARP spoofing/MITM, no
-  switch change, no reboot of the host, no Plex/backup interruption, no OS upgrade.
-- Pi-hole DHCP off; no `67/udp` published; no `NET_ADMIN` granted.
-- No firewall rules added (UFW `53`/`3001` were already open from a prior plan).
+  ARP spoofing/MITM, no switch change, no reboot of the host, no Plex/backup
+  interruption, no OS upgrade.
+- Pi-hole DHCP off; no `67/udp` published.
+- The only live network changes made are TVGuard's own, surgically scoped
+  footprint: the `tvguard` table (inert until a TV uses the box as gateway),
+  two `ufw-user-forward` rules scoped to the two TV IPs, and two sysctls
+  (`ip_forward`, `send_redirects`) — all one-command removable (ROLLBACK.md).
+  No blanket LAN filtering, no NAT of non-TV traffic, no client redirected.
 
 ## 21. Final Verification (2026-09-20)
 
-`scripts/health-check.sh` → **ALL CHECKS PASSED**:
+`scripts/health-check.sh` → **ALL CHECKS PASSED** (re-run after TVGuard work; see
+`reports/05-tvguard-gateway.md` §9 for the gateway selftest):
 - Plex, Samba, Winbind, no-ip, Transmission, SSH: **active**.
 - Docker: 4 containers up (pihole healthy + 3 invoice).
 - Local DNS test: NOERROR. Blocking test: blackhole confirmed, then unblocked.
 - Persistence across `docker restart`: group + deny entry retained.
-- **No** DHCP server on `67`; **no** new FORWARD/NAT rules; router untouched; no
-  clients redirected. `ss -lntup`, `docker ps`, `free -h`, `df -h` captured in
-  `reports/raw/14-final-state.txt`.
+- **TVGuard selftest: 7/7 PASS** (mock-TV netns: DNS-bypass redirect with correct
+  per-client attribution, HTTP/HTTPS egress via masquerade, conntrack return path
+  through .128, UFW coexistence, full teardown).
+- **TVGuard state**: `table ip tvguard` loaded in `monitor` mode; counters at 0
+  (dormant — no TV uses the box as gateway yet); `ufw-user-forward` holds exactly
+  the two TV rules; sysctls set; `tvguard.service` enabled + active (gated by the
+  `active` marker).
+- **No** DHCP server on `67`; router untouched; no clients redirected; UFW/Docker
+  rule sets verified unchanged against the pre-change baseline
+  (`reports/raw/05-baseline-netfilter.txt`).
+
+## 22. TVGuard one-arm gateway PoC (added 2026-09-20)
+
+The complete privacy/monitoring/firewall PoC now runs on this machine — the
+dedicated box will inherit this repo rather than the project "starting over".
+
+- **Design & proof**: `reports/05-tvguard-gateway.md` (one-arm NAT correctness,
+  the base-chain ordering finding, DNS-bypass DNAT, IPv6 assessment, limitations).
+- **Your manual steps only**: `ROUTER_NEXT_STEPS_V2.md` (Hub reservations +
+  Samsung gateway/DNS change + the monitor test sequence).
+- **One-command rollback**: `ROLLBACK.md` R0 → `sudo scripts/tvguard-disable.sh`.
+- **Migration**: `MIGRATION_TO_DEDICATED_BOX.md` + `bootstrap.sh` on the new box.
+- **Session evidence workflow**: `sudo scripts/tv-session.sh samsung <label> <dur>`
+  then `python3 scripts/compare-tv-sessions.py <dir1> <dir2> [--out file]`.

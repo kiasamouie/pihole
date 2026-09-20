@@ -1,0 +1,21 @@
+[Unit]
+# TVGuard - re-apply the one-arm TV egress ruleset at boot.
+# Only runs when the "active" marker is present (set by the enable scripts,
+# removed by tvguard-disable.sh), so a disabled install stays off after reboot.
+Description=TVGuard one-arm TV egress policy (nftables table ip tvguard)
+# After docker.service so the pihole container IP (used by the DNS-bypass
+# DNAT) can be resolved; the apply script falls back to `redirect` if not up.
+After=network-online.target docker.service
+Wants=network-online.target
+ConditionPathExists=@STATE_DIR@/active
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Re-applies the mode recorded in the state file (monitor/enforce). Idempotent.
+# (No ExecStop: disabling is done explicitly via scripts/tvguard-disable.sh to
+#  avoid systemd re-entrancy.)
+ExecStart=@ROOT@/scripts/tvguard-apply.sh
+# Fail safely: never flush other tables; a failure here leaves the rest running.
+[Install]
+WantedBy=multi-user.target

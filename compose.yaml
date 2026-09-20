@@ -32,6 +32,10 @@ services:
       - "53:53/tcp"
       - "53:53/udp"
       - "3001:80/tcp"
+      # Self-signed HTTPS admin (container 443). Browsers show a cert
+      # warning (CN=pi.hole) - expected for a self-hosted admin.
+      # See reports/05-tvguard-gateway.md for the rationale.
+      - "3443:443/tcp"
     volumes:
       - ./etc-pihole:/etc/pihole
     restart: unless-stopped

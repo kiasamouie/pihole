@@ -1,0 +1,74 @@
+#
+# TVGuard destination evidence ledger  (config/destinations.yaml)
+#
+# This is the single source of truth for TV destination classification.
+# The firewall (enforce mode) and the Pi-hole per-group denylist are GENERATED
+# from this file - not from a giant internet blocklist. Every entry must carry
+# evidence. Nothing here is enforced until a human marks it `blocked` after
+# testing.
+#
+# IMPORTANT - DO NOT trust a hostname. "Looks like telemetry" is NOT evidence.
+# A destination is classified ONLY from:
+#   1) empirical tv-session.sh captures (idle vs action)  -> observed fact
+#   2) cross-check against reputable sources               -> corroboration
+# Classifications below are SEEDS. They are low-confidence and `tested: false`.
+# They must be confirmed or corrected by the capture+compare workflow before any
+# blocking is applied (see scripts/tv-session.sh and scripts/compare-tv-sessions.py).
+#
+# --- Class values (class:) -----------------------------------------------------
+#   essential            required for the TV to function (blocking breaks it)
+#   likely-essential     strong signal it is needed; test before blocking
+#   unknown              seen in traffic, purpose not yet determined
+#   analytics            usage/behaviour analytics
+#   advertising          ad delivery / ad network
+#   telemetry            device health / diagnostics / crash reporting
+#   crash-reporting      crash/diagnostics reports (subset of telemetry)
+#   voice-related        voice assistant / transcription / command service
+#   safe-to-test-block   candidate to trial-block, with a breakage watch
+#   blocked              actively blocked (nft + Pi-hole) - set only after test
+#   do-not-block         must never be blocked
+#
+# --- Per-entry fields ----------------------------------------------------------
+#   domain:   FQDN (used by the Pi-hole denylist)
+#   ip:       resolved IP/CIDR, optional (used by the nft tv_blocked set)
+#   class:    one of the values above
+#   evidence: what was actually observed (session, bytes, correlation)
+#   source:   where the claim comes from (Samsung docs / research / list / you)
+#   reason:   why this class
+#   confidence: low | medium | high
+#   date-tested:  YYYY-MM-DD the entry was last empirically tested (or "")
+#   breakage:  what broke when it was blocked (or "none"/"not-tested")
+#
+# --- How it is consumed --------------------------------------------------------
+#   scripts/gen-policies.sh  reads this file:
+#     - any entry with class: blocked  -> its ip: goes to the nft `tv_blocked` set
+#                                        its domain: is pushed to Pi-hole (per-group)
+#     - all entries -> the generated policy report (for human review)
+#   In MONITOR mode nothing here is enforced; it is logging only.
+#
+# The top-level `destinations:` list is a YAML array. Keep `ip:` empty for
+# domain-only entries.
+
+destinations:
+  # --- No live entries yet. ---
+  # Nothing is classified, and therefore nothing is blocked, until evidence
+  # exists. Add entries as the tv-session.sh + compare-tv-sessions.py workflow
+  # produces evidence, e.g.:
+  #
+  # - domain: <fqdn seen in dns.csv>
+  #   ip: <dst IP from connections.csv, or "" if unknown>
+  #   class: telemetry
+  #   evidence: "Appears only in 'idle' and 'voice' sessions; 412KB out in 30s; absent during YouTube/Plex"
+  #   source: "captures/20260920-...-samsung-voice/summary.md; cross-checked against Samsung privacy documentation"
+  #   reason: "Correlated with background/voice use; no user-facing function identified"
+  #   confidence: medium
+  #   date-tested: "2026-09-20"
+  #   breakage: not-tested
+  #
+  # Note on Samsung seed domains (recorded for the first investigation pass, NOT
+  # classified): api.samsung.com, smarthings.samsungapis.com, ads.samsung.com,
+  # ads-qa.samsung.com were seen in community lists. They are listed here only as
+  # *things to look for* in the captures - none of them is classified until it is
+  # actually observed in our own sessions and cross-checked against a reputable
+  # source. Treat each the same way: observe first, classify with evidence, then
+  # mark class: blocked only after a test block shows no breakage.

@@ -1,86 +1,117 @@
-# ROLLBACK — stop / disable / remove the Pi-hole PoC
+# ROLLBACK — TVGuard + Pi-hole PoC (v2)
 
-Everything here affects **only** the new Pi-hole stack and the packages this
-session installed. It does **not** touch Plex, Samba, backups, the invoice
-Docker containers, the Hub, or any pre-existing firewall rules.
-
-**Order of safety**: do the least-destructive thing first. Each level is
-reversible up to "remove".
+Everything here affects **only** this project's footprint: the `tvguard`
+nftables table, the two per-TV `ufw-user-forward` rules, two sysctls, the
+`tvguard` systemd unit, and the Pi-hole compose stack. It never touches
+Plex, Samba, Transmission, SSH, the invoice containers, the Hub, or any
+pre-existing firewall rule. No command below flushes a firewall or resets UFW.
 
 ---
 
-## L0 — Check state (no changes)
+## R0 — TVGuard firewall/gateway: ONE-COMMAND emergency rollback
+
 ```bash
-scripts/health-check.sh                 # pre-existing services + Pi-hole
-docker ps                                # pihole should be the only "new" container
-ss -lntup | grep -E ':53|:3001'          # Pi-hole's listeners
+cd /home/kia/dns && sudo scripts/tvguard-disable.sh
 ```
 
-## L1 — Stop the Pi-hole stack (keeps config/state on disk)
-```bash
-cd /home/kia/dns
-docker compose stop pihole
+This removes **only** the TVGuard footprint:
+
+| Removed | Mechanism |
+|---|---|
+| nftables table `ip tvguard` (the whole PoC ruleset) | `nft delete table ip tvguard` — never any other table |
+| the two `ufw-user-forward` ACCEPT rules (`-s 192.168.0.197`, `-s 192.168.0.90`) | `ufw route delete allow from <tv> to any`, only if the source is one of our TV IPs |
+| `net.ipv4.ip_forward` + `net.ipv4.conf.enp2s0.send_redirects` values | restored from the baseline captured at first apply |
+| `/etc/sysctl.d/99-tvguard.conf` + `/var/lib/tvguard/sysctl.conf` | deleted |
+| `tvguard.service` (stopped + disabled) | our own unit only |
+| state markers (`/var/lib/tvguard/{active,state}`) | deleted, so boot will not re-apply |
+
+Explicitly **NOT** touched: any other UFW rule/chain, Docker's chains/NAT,
+the raw table, `ip6` tables, Pi-hole, Plex, Samba, or anything else.
+
+**After** the one-command rollback, revert the TV(s):
+
 ```
-- DNS on `:53` and the UI on `:3001` stop answering. Groups/lists remain in
+Samsung:  gateway = 192.168.0.1, DNS = automatic
+```
+
+That alone restores the original network path for that TV even *before* you
+run the rollback (the TV simply stops using us).
+
+Verify clean:
+
+```bash
+sudo scripts/tvguard-status.sh     # "not loaded", no ufw route rules
+sudo scripts/health-check.sh       # pre-existing services all active
+```
+
+Re-enable later (idempotent): `sudo scripts/tvguard-enable-monitor.sh`.
+
+## R1 — Check state (no changes)
+
+```bash
+scripts/health-check.sh            # pre-existing services + Pi-hole + TVGuard
+sudo scripts/tvguard-status.sh      # TVGuard mode/table/counters (read-only)
+docker ps                          # pihole + invoice stack
+ss -lntup | grep -E ':53|:3001|:3443'
+```
+
+## R2 — Stop the Pi-hole stack (keeps config/state on disk)
+
+```bash
+cd /home/kia/dns && docker compose stop pihole
+```
+- DNS `:53`, UI `:3001`/`:3443` stop answering. All groups/lists remain in
   `etc-pihole/` (no data loss).
-- **Resume**: `docker compose start pihole` (or `docker start pihole`).
+- **Resume**: `docker compose start pihole`.
+- Note: while stopped, TVGuard's DNS-bypass DNAT falls back to `redirect` on
+  next apply (the apply script re-resolves the container IP).
 
-## L2 — Inspect logs (while stopped or running)
+## R3 — Inspect logs
+
 ```bash
-docker logs --tail 200 pihole           # container log (FTL + web)
-ls etc-pihole/                          # pihole-FTL.log, dnsmasq log, gravity.db, query DB
-tail -n 50 etc-pihole/pihole-FTL.log    # FTL engine log
+docker logs --tail 200 pihole
+tail -n 50 etc-pihole/pihole-FTL.log
+ls etc-pihole/
+sudo journalctl -S -30 --grep 'TVGUARD\|tvguard' --no-pager | tail -40
 ```
 
-## L3 — Remove the container (keeps `etc-pihole/` data for later restore)
-```bash
-cd /home/kia/dns
-docker compose down                      # removes container + its docker network
-# (optionally) docker rmi pihole/pihole:2026.09.0   # remove the image
-```
-- `etc-pihole/` (config, gravity DB, groups/clients, query log) is **kept** —
-  `docker compose up -d` will come right back with all settings.
+## R4 — Remove the Pi-hole container (keeps `etc-pihole/` for restore)
 
-## L4 — Full removal (config + data + packages)
 ```bash
-cd /home/kia/dns
-docker compose down
-rm -rf etc-pihole                        # Pi-hole state (config, DB, logs)
-rm -f    .env                            # credentials (or keep your records separately)
+cd /home/kia/dns && docker compose down        # container + its bridge
+docker rmi pihole/pihole:2026.09.0 2>/dev/null # optional image removal
+```
+`docker compose up -d` brings everything back with all settings intact.
+
+## R5 — Full removal (Pi-hole + TVGuard footprint)
+
+```bash
+sudo scripts/tvguard-disable.sh               # R0 first
+cd /home/kia/dns && docker compose down
+rm -rf etc-pihole                             # Pi-hole state (config, DB, logs)
+rm -f    .env                                 # credentials (keep records elsewhere)
 docker rmi pihole/pihole:2026.09.0 2>/dev/null
+# optional: remove the diagnostic packages this project added
+sudo apt-get remove -y arp-scan nmap avahi-utils conntrack tcpdump
 ```
-Then, if you also want the diagnostic packages gone:
-```bash
-sudo apt-get remove -y arp-scan nmap avahi-utils conntrack
-sudo apt-get autoremove -y
-```
-> Note: `tcpdump`, `ethtool`, `procps`, `dnsutils` (dig) were installed/confirmed
-> this session but are general-purpose tools you may want to keep — removing them
-> is optional. `shellcheck` (if present) predates this work — leave it.
-
-**What is NOT part of rollback** (was pre-existing, do not touch):
-- The UFW rules (incl. the `53`/`3001` LAN allowances) — pre-existing from an old
-  AdGuard plan.
-- The invoice Docker containers and the raw iptables DROP rules shielding them.
-- `net.ipv4.ip_forward = 1` (Docker, pre-existing).
-- Plex, Samba/Winbind, no-ip, Transmission, SSH (port 13567), translator-docs.
+Optionally remove `captures/` (session recordings, git-ignored) and
+`reports/raw/` artefacts you no longer want. The repo itself can then be
+deleted; nothing on the live network depends on it anymore.
 
 ## L5 — Revert anything the staged rollout changed on the Hub
-(Only relevant **after** you've followed `ROUTER_NEXT_STEPS.md`.)
-- Remove the IP reservation (Step 1).
-- Reset per-device DNS back to automatic (Steps 2–4).
-- If global DNS was set (Step 8 Option B), reset it to the Hub default.
-- Remove any group-scoped denylist entries you added in Pi-hole (UI or API).
+
+(Only relevant **after** you've followed `ROUTER_NEXT_STEPS_V2.md`.)
+- Remove the two IP reservations (Steps 1–2) if you want.
+- Reset the Samsung to gateway `192.168.0.1` / DNS automatic (Step 6).
+- Remove any group-scoped denylist entries you added in Pi-hole.
 
 ---
 
-## Confirming a clean rollback
+## Confirming a clean full rollback
+
 ```bash
-ss -lntup | grep -E ':53|:3001'          # should print nothing (no listeners)
-docker ps                                # pihole should be gone; invoice stack intact
-scripts/health-check.sh                  # note: its Pi-hole checks will now FAIL by
-                                          # design (Pi-hole absent) — the pre-existing
-                                          # service lines must still be OK
+sudo scripts/tvguard-status.sh                 # not loaded, no ufw route rules
+ss -lntup | grep -E ':53|:3001|:3443'          # should print nothing
+docker ps                                      # invoice stack intact, no pihole
+scripts/health-check.sh                        # pre-existing service lines all active
 ```
-If the pre-existing service lines in `health-check.sh` are all `active`, the
-rollback is complete and safe.

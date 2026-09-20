@@ -1,0 +1,47 @@
+#
+# TVGuard configuration — one-arm TV egress PoC
+#
+# Machine-specific, NO SECRETS. Sourced (shell) by scripts/tvguard-apply.sh.
+# Copy this file to tvguard.conf (which is git-ignored) and adjust the values.
+#
+# Two deployment modes are supported by the SAME scripts:
+#
+#   MODE=onearm-poc       this PoC on kiaserver. The TV uses THIS host as its
+#                         IPv4 gateway/DNS. Traffic: TV -> us (SNAT/masquerade)
+#                         -> upstream router (Virgin Hub .1) -> Internet. One NIC.
+#   MODE=dualnic-gateway  the future dedicated box. We ARE the router: a WAN
+#                         interface (to the modem) and a LAN interface. Set
+#                         WAN_INTERFACE. Same scripts, different values.
+#
+# Migrations between the two only change these values, never the scripts.
+
+# onearm-poc | dualnic-gateway
+MODE=onearm-poc
+
+# --- LAN side (the home network) -------------------------------------------
+LAN_INTERFACE=enp2s0
+LAN_SUBNET=192.168.0.0/24
+
+# This host's LAN IP: the PoC gateway/DNS the TVs will be pointed at.
+GATEWAY_IP=192.168.0.128
+PIHOLE_IP=192.168.0.128
+
+# Upstream toward the Internet.
+#   onearm-poc     : the Virgin Hub (.1) — it stays router+DHCP.
+#   dualnic-gateway: the modem's LAN IP behind the WAN interface.
+UPSTREAM_ROUTER=192.168.0.1
+
+# dualnic-gateway only: the WAN-facing interface. Leave empty for onearm-poc.
+WAN_INTERFACE=
+
+# --- TVs to which the TVGuard policy is applied (space-separated) ----------
+# Only these source IPs are affected. Every other LAN device is untouched.
+TVS="192.168.0.197 192.168.0.90"
+
+# Convenience aliases for scripts/tv-session.sh (samsung | google)
+SAMSUNG_IP=192.168.0.197
+GOOGLE_TV_IP=192.168.0.90
+
+# State directory (created if missing): holds the active MODE and the sysctl
+# baseline captured at enable-time (restored on disable). Runtime, not in git.
+STATE_DIR=/var/lib/tvguard
