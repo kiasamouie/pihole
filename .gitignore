@@ -1,0 +1,14 @@
+# Secrets — never commit
+.env
+secrets/
+
+# Pi-hole runtime state (config, gravity DB, query log)
+etc-pihole/
+
+# Raw captures and bulky artifacts
+reports/raw/*.pcap
+*.pcap
+
+# Local scratch
+data/*.tmp
+.DS_Store

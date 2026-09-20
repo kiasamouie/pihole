@@ -1,0 +1,13 @@
+ip,mac,oui_vendor,ptr_hostname,ssdp_upnp,open_ports,evidence,likely_category
+192.168.0.1,D8:33:B7:C5:4D:4B,Sagemcom Broadband SAS,(none),yes,"53 80 443",Virgin Hub 3 (gateway/router),router
+192.168.0.32,AA:28:D5:3F:7A:88,locally-administered,(none),no,"(none probed open)",no SSDP, all 14 probed ports closed; randomised MAC,unknown-likely-IoT-or-android
+192.168.0.83,60:22:32:4C:D7:AC,Ubiquiti Networks Inc.,Access,no,"22 8080",Ubiquiti UniFi device (AP or controller node; default hostname Access),network-infrastructure
+192.168.0.90,14:C1:4E:1C:2F:4B,Google Inc.,Chromecast,yes,"8443","UPnP DIAL receiver: friendlyName 'Living Room TV'; modelName 'Eureka Dongle'; X-User-Agent 'redsonic' (Google TV Streamer codename); Chromecast discovery UDP/10101","SMART-TV (Google TV Streamer)"
+192.168.0.128,68:1D:EF:32:4F:56,(this server),kiaserver,yes,"5050 13567 8088 445 139 9091 51413 32400",Plex/backup/Samba/server (this box),server
+192.168.0.147,34:5A:60:36:DC:42,unknown/randomised,helix-01,yes,"22 80",own firewall active (other ports filtered); name suggests home-automation or second server,unknown-server-like
+192.168.0.181,C0:4B:24:49:8C:6C,unknown,(none),no,"(none probed open)",no SSDP, all probed ports closed,unknown-likely-IoT
+192.168.0.187,76:0F:9B:43:64:F1,locally-administered,Galaxy-Tab-S6-Lite,no,"(none probed open)",Android tablet with MAC randomisation (Samsung Galaxy Tab S6 Lite),tablet
+192.168.0.197,1C:86:9A:AA:8E:96,Samsung Electronics Co.,Ltd,Samsung,yes,"8080","UPnP: Samsung-Linux/4.1 Samsung_UPnP_SDK/1.0; DIAL receiver '65\" QLED' model QE65Q75CATXXU (Q75A Tizen 2021); DMR :9197/dmr; screen-sharing :9119; SmartThings beacon 224.0.0.7:8001 (8001/ms/1.0, 8001/api/v2)","SMART-TV (Samsung 65in QLED)"
+192.168.0.206,D8:5E:D3:0E:C7:06,Giga-byte Technology Co.,KiaPC (KIAPC),yes,"445",Windows PC with Samba share (backup client); own firewall active (filtered),pc-windows
+192.168.0.212,34:2E:B7:47:05:D1,Intel Corporate,DESKTOP-KSLH164,yes,"(filtered)",Windows PC on Intel NUC hardware; Windows firewall active,pc-windows
+192.168.0.225,F0:C8:14:40:FB:3F,Shenzhen Bilian Electronic,dgiot,no,"(none probed open)",DGIOT-brand IoT device (Shenzhen Bilian OUI); broadcasts 255.255.255.255:6667 every 5s,iot

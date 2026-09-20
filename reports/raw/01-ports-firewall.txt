@@ -1,0 +1,221 @@
+=== SS LISTEN ===
+Netid State  Recv-Q Send-Q                      Local Address:Port  Peer Address:PortProcess                                                             
+udp   UNCONN 0      0                              172.19.0.1:47781      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=72))                          
+udp   UNCONN 0      0                              172.17.0.1:56963      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=73))                          
+udp   UNCONN 0      0                                 0.0.0.0:32410      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=90))                          
+udp   UNCONN 0      0                                 0.0.0.0:32412      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=91))                          
+udp   UNCONN 0      0                                 0.0.0.0:32413      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=61))                          
+udp   UNCONN 0      0                                 0.0.0.0:32414      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=79))                          
+udp   UNCONN 0      0                              172.17.0.1:41008      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=81))                          
+udp   UNCONN 0      0                           192.168.0.128:68         0.0.0.0:*    users:(("dhcpcd",pid=2542,fd=3))                                   
+udp   UNCONN 0      0                           192.168.0.255:137        0.0.0.0:*    users:(("nmbd",pid=1023,fd=24))                                    
+udp   UNCONN 0      0                           192.168.0.128:137        0.0.0.0:*    users:(("nmbd",pid=1023,fd=23))                                    
+udp   UNCONN 0      0                          172.17.255.255:137        0.0.0.0:*    users:(("nmbd",pid=1023,fd=19))                                    
+udp   UNCONN 0      0                              172.17.0.1:137        0.0.0.0:*    users:(("nmbd",pid=1023,fd=18))                                    
+udp   UNCONN 0      0                          172.19.255.255:137        0.0.0.0:*    users:(("nmbd",pid=1023,fd=15))                                    
+udp   UNCONN 0      0                              172.19.0.1:137        0.0.0.0:*    users:(("nmbd",pid=1023,fd=14))                                    
+udp   UNCONN 0      0                                 0.0.0.0:137        0.0.0.0:*    users:(("nmbd",pid=1023,fd=12))                                    
+udp   UNCONN 0      0                           192.168.0.255:138        0.0.0.0:*    users:(("nmbd",pid=1023,fd=26))                                    
+udp   UNCONN 0      0                           192.168.0.128:138        0.0.0.0:*    users:(("nmbd",pid=1023,fd=25))                                    
+udp   UNCONN 0      0                          172.17.255.255:138        0.0.0.0:*    users:(("nmbd",pid=1023,fd=21))                                    
+udp   UNCONN 0      0                              172.17.0.1:138        0.0.0.0:*    users:(("nmbd",pid=1023,fd=20))                                    
+udp   UNCONN 0      0                          172.19.255.255:138        0.0.0.0:*    users:(("nmbd",pid=1023,fd=17))                                    
+udp   UNCONN 0      0                              172.19.0.1:138        0.0.0.0:*    users:(("nmbd",pid=1023,fd=16))                                    
+udp   UNCONN 0      0                                 0.0.0.0:138        0.0.0.0:*    users:(("nmbd",pid=1023,fd=13))                                    
+udp   UNCONN 0      0                                 0.0.0.0:1901       0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=74))                          
+udp   UNCONN 0      0                                 0.0.0.0:51413      0.0.0.0:*    users:(("transmission-da",pid=915,fd=14))                          
+udp   UNCONN 0      0                              172.19.0.1:35171      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=80))                          
+udp   UNCONN 0      0                           192.168.0.128:43363      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=70))                          
+udp   UNCONN 0      0                               127.0.0.1:51645      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=62))                          
+udp   UNCONN 0      0                               127.0.0.1:60075      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=68))                          
+udp   UNCONN 0      0                              172.19.0.1:35613      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=64))                          
+udp   UNCONN 0      0                           192.168.0.128:38270      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=75))                          
+udp   UNCONN 0      0                              172.17.0.1:46601      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=65))                          
+udp   UNCONN 0      0                           192.168.0.128:54872      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=63))                          
+udp   UNCONN 0      0      [fe80::c23c:1804:6d08:d906]%enp2s0:546           [::]:*    users:(("dhcpcd",pid=2354,fd=3))                                   
+udp   UNCONN 0      0                                    [::]:51413         [::]:*    users:(("transmission-da",pid=915,fd=15))                          
+tcp   LISTEN 0      128                               0.0.0.0:5050       0.0.0.0:*    users:(("python",pid=913,fd=3))                                    
+tcp   LISTEN 0      128                               0.0.0.0:13567      0.0.0.0:*    users:(("sshd",pid=949,fd=6))                                      
+tcp   LISTEN 0      4096                              0.0.0.0:8088       0.0.0.0:*    users:(("docker-proxy",pid=1618,fd=8))                             
+tcp   LISTEN 0      50                                0.0.0.0:445        0.0.0.0:*    users:(("smbd-scavenger",pid=758915,fd=30),("smbd",pid=1401,fd=30))
+tcp   LISTEN 0      50                                0.0.0.0:139        0.0.0.0:*    users:(("smbd-scavenger",pid=758915,fd=31),("smbd",pid=1401,fd=31))
+tcp   LISTEN 0      128                               0.0.0.0:9091       0.0.0.0:*    users:(("transmission-da",pid=915,fd=16))                          
+tcp   LISTEN 0      128                             127.0.0.1:38215      0.0.0.0:*    users:(("Plex Script Hos",pid=1049,fd=7))                          
+tcp   LISTEN 0      4096                              0.0.0.0:51413      0.0.0.0:*    users:(("transmission-da",pid=915,fd=12))                          
+tcp   LISTEN 0      1024                            127.0.0.1:32401      0.0.0.0:*    users:(("Plex Media Serv",pid=930,fd=52))                          
+tcp   LISTEN 0      128                             127.0.0.1:32600      0.0.0.0:*    users:(("Plex Tuner Serv",pid=1379,fd=10))                         
+tcp   LISTEN 0      128                                  [::]:13567         [::]:*    users:(("sshd",pid=949,fd=7))                                      
+tcp   LISTEN 0      4096                                 [::]:8088          [::]:*    users:(("docker-proxy",pid=1628,fd=8))                             
+tcp   LISTEN 0      1024                                    *:32400            *:*    users:(("Plex Media Serv",pid=930,fd=51))                          
+tcp   LISTEN 0      50                                   [::]:445           [::]:*    users:(("smbd-scavenger",pid=758915,fd=28),("smbd",pid=1401,fd=28))
+tcp   LISTEN 0      50                                   [::]:139           [::]:*    users:(("smbd-scavenger",pid=758915,fd=29),("smbd",pid=1401,fd=29))
+tcp   LISTEN 0      4096                                 [::]:51413         [::]:*    users:(("transmission-da",pid=915,fd=13))                          
+
+=== FORWARDING ===
+1
+0
+
+=== ETHTOOL enp2s0 ===
+sh: 1: ethtool: not found
+
+=== LSPCI net ===
+02:00.0 Ethernet controller [0200]: Realtek Semiconductor Co., Ltd. RTL8111/8168/8211/8411 PCI Express Gigabit Ethernet Controller [10ec:8168] (rev 15)
+	Subsystem: Realtek Semiconductor Co., Ltd. Device [10ec:0123]
+	Kernel driver in use: r8169
+--
+03:00.0 Network controller [0280]: Realtek Semiconductor Co., Ltd. RTL8852BE PCIe 802.11ax Wireless Network Controller [10ec:b852]
+	Subsystem: Realtek Semiconductor Co., Ltd. RTL8852BE PCIe 802.11ax Wireless Network Controller [10ec:b852]
+	Kernel driver in use: rtw89_8852be
+	Kernel modules: rtw89_8852be
+
+=== UFW ===
+/usr/sbin/ufw
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), deny (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+32400/tcp                  ALLOW IN    192.168.0.0/24            
+9091/tcp                   ALLOW IN    192.168.0.0/24            
+13567/tcp                  ALLOW IN    Anywhere                   # SSH custom port
+445/tcp                    ALLOW IN    192.168.0.0/24             # Samba SMB
+139/tcp                    ALLOW IN    192.168.0.0/24             # Samba NetBIOS
+137/udp                    ALLOW IN    192.168.0.0/24             # Samba NetBIOS name
+138/udp                    ALLOW IN    192.168.0.0/24             # Samba NetBIOS datagram
+9091/tcp                   ALLOW IN    Anywhere                   # Transmission Web UI
+32400/tcp                  ALLOW IN    Anywhere                   # Plex Media Server
+5050/tcp                   ALLOW IN    172.16.0.0/12              # Docker containers to translator-docs
+5050/tcp                   ALLOW IN    192.168.0.0/24             # LAN access to translator-docs web UI
+53/tcp                     ALLOW IN    192.168.0.0/24             # AdGuard Home DNS TCP
+53/udp                     ALLOW IN    192.168.0.0/24             # AdGuard Home DNS UDP
+3001/tcp                   ALLOW IN    192.168.0.0/24             # AdGuard Home web admin
+13567/tcp (v6)             ALLOW IN    Anywhere (v6)              # SSH custom port
+9091/tcp (v6)              ALLOW IN    Anywhere (v6)              # Transmission Web UI
+32400/tcp (v6)             ALLOW IN    Anywhere (v6)              # Plex Media Server
+
+
+=== IPTABLES-SAVE ===
+# Generated by iptables-save v1.8.11 (nf_tables) on Sun Sep 20 11:20:00 2026
+*raw
+:PREROUTING ACCEPT [555712853:12757022601860]
+:OUTPUT ACCEPT [0:0]
+-A PREROUTING -d 172.19.0.2/32 ! -i br-1725cc87228d -j DROP
+-A PREROUTING -d 172.19.0.3/32 ! -i br-1725cc87228d -j DROP
+-A PREROUTING -d 172.19.0.4/32 ! -i br-1725cc87228d -j DROP
+COMMIT
+# Completed on Sun Sep 20 11:20:00 2026
+# Generated by iptables-save v1.8.11 (nf_tables) on Sun Sep 20 11:20:00 2026
+*filter
+:INPUT DROP [596405:250087262]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [38:2131]
+:DOCKER - [0:0]
+:DOCKER-BRIDGE - [0:0]
+:DOCKER-CT - [0:0]
+:DOCKER-FORWARD - [0:0]
+:DOCKER-INTERNAL - [0:0]
+:DOCKER-USER - [0:0]
+:ufw-after-forward - [0:0]
+:ufw-after-input - [0:0]
+:ufw-after-logging-forward - [0:0]
+:ufw-after-logging-input - [0:0]
+:ufw-after-logging-output - [0:0]
+:ufw-after-output - [0:0]
+:ufw-before-forward - [0:0]
+:ufw-before-input - [0:0]
+:ufw-before-logging-forward - [0:0]
+:ufw-before-logging-input - [0:0]
+:ufw-before-logging-output - [0:0]
+:ufw-before-output - [0:0]
+:ufw-logging-allow - [0:0]
+:ufw-logging-deny - [0:0]
+:ufw-not-local - [0:0]
+:ufw-reject-forward - [0:0]
+:ufw-reject-input - [0:0]
+:ufw-reject-output - [0:0]
+:ufw-skip-to-policy-forward - [0:0]
+:ufw-skip-to-policy-input - [0:0]
+:ufw-skip-to-policy-output - [0:0]
+:ufw-track-forward - [0:0]
+:ufw-track-input - [0:0]
+:ufw-track-output - [0:0]
+:ufw-user-forward - [0:0]
+:ufw-user-input - [0:0]
+:ufw-user-limit - [0:0]
+:ufw-user-limit-accept - [0:0]
+:ufw-user-logging-forward - [0:0]
+:ufw-user-logging-input - [0:0]
+:ufw-user-logging-output - [0:0]
+:ufw-user-output - [0:0]
+-A INPUT -j ufw-before-logging-input
+-A INPUT -j ufw-before-input
+-A INPUT -j ufw-after-input
+-A INPUT -j ufw-after-logging-input
+-A INPUT -j ufw-reject-input
+-A INPUT -j ufw-track-input
+-A FORWARD -j DOCKER-USER
+-A FORWARD -j DOCKER-FORWARD
+
+=== NFT ===
+table ip filter {
+	chain ufw-before-logging-input {
+	}
+
+	chain ufw-before-logging-output {
+	}
+
+	chain ufw-before-logging-forward {
+	}
+
+	chain ufw-before-input {
+		iifname "lo" counter packets 1531166 bytes 193762734 accept
+		ct state related,established counter packets 550391822 bytes 12756395178223 accept
+		ct state invalid counter packets 295 bytes 13276 jump ufw-logging-deny
+		ct state invalid counter packets 295 bytes 13276 drop
+		ip protocol icmp icmp type destination-unreachable counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type time-exceeded counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type parameter-problem counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type echo-request counter packets 18918 bytes 1589112 accept
+		udp sport 67 udp dport 68 counter packets 45 bytes 16743 accept
+		counter packets 3736021 bytes 429809487 jump ufw-not-local
+		ip daddr 224.0.0.251 udp dport 5353 counter packets 0 bytes 0 accept
+		ip daddr 239.255.255.250 udp dport 1900 counter packets 4 bytes 550 accept
+		counter packets 3736017 bytes 429808937 jump ufw-user-input
+	}
+
+	chain ufw-before-output {
+		oifname "lo" counter packets 1531166 bytes 193762734 accept
+		ct state related,established counter packets 418401388 bytes 56902273774 accept
+		counter packets 4437727 bytes 312532175 jump ufw-user-output
+	}
+
+	chain ufw-before-forward {
+		ct state related,established counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type destination-unreachable counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type time-exceeded counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type parameter-problem counter packets 0 bytes 0 accept
+		ip protocol icmp icmp type echo-request counter packets 0 bytes 0 accept
+		counter packets 0 bytes 0 jump ufw-user-forward
+	}
+
+	chain ufw-after-input {
+		udp dport 137 counter packets 64 bytes 6000 jump ufw-skip-to-policy-input
+		udp dport 138 counter packets 13770 bytes 3277020 jump ufw-skip-to-policy-input
+		tcp dport 139 counter packets 0 bytes 0 jump ufw-skip-to-policy-input
+		tcp dport 445 counter packets 0 bytes 0 jump ufw-skip-to-policy-input
+		udp dport 67 counter packets 1355 bytes 498208 jump ufw-skip-to-policy-input
+		udp dport 68 counter packets 0 bytes 0 jump ufw-skip-to-policy-input
+		fib daddr type broadcast counter packets 3101834 bytes 172519228 jump ufw-skip-to-policy-input
+	}
+
+	chain ufw-after-output {
+	}
+
+	chain ufw-after-forward {
+	}
+
+	chain ufw-after-logging-input {
+		limit rate 3/minute burst 10 packets counter packets 124089 bytes 54409122 log prefix "[UFW BLOCK] "
+	}

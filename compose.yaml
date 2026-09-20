@@ -1,0 +1,42 @@
+# Pi-hole v6 (Docker) — kiaserver
+# Docs: https://docs.pi-hole.net/docker/  https://docs.pi-hole.net/docker/configuration/
+#
+# Design notes:
+# - Pinned to a specific stable image tag (2026.09.0 = FTL v6.7.1, includes
+#   security fixes for GHSA-2794-hrj8-5jg9 and others). No `latest`, no `nightly`.
+# - Host ports 53/tcp+53/udp and 3001/tcp are ALREADY allowed by the existing
+#   UFW policy (192.168.0.0/24) from a previous AdGuard Home plan — no UFW changes needed.
+# - 3001/tcp on the host maps to the Pi-hole web UI (container port 80).
+#   The container's self-signed HTTPS (443) is intentionally NOT published.
+# - DHCP is DISABLED: no 67/udp mapping, no NET_ADMIN capability.
+#   The Virgin hub remains the DHCP server.
+# - Config/state persists in ./etc-pihole (git-ignored).
+# - Admin password comes from .env (git-ignored, mode 600) via
+#   FTLCONF_webserver_api_password — the v6 "single source of truth" mechanism.
+
+services:
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:2026.09.0
+    environment:
+      TZ: ${TZ}
+      FTLCONF_webserver_api_password: ${ADMIN_PASSWORD}
+      # Upstream resolvers: Cloudflare (primary), Quad9 (secondary; also
+      # provides upstream malware-domain blocking). Both are maintained,
+      # privacy-respecting, and do not serve ads/telemetry for lookups.
+      FTLCONF_dns_upstreams: "1.1.1.1;9.9.9.9"
+      # Container sits on a docker bridge; ALL makes FTL listen on every
+      # interface inside the container (required in bridge mode).
+      FTLCONF_dns_listeningMode: ALL
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "3001:80/tcp"
+    volumes:
+      - ./etc-pihole:/etc/pihole
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

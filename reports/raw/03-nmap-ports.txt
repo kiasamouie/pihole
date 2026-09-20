@@ -1,0 +1,202 @@
+Starting Nmap 7.95 ( https://nmap.org ) at 2026-09-20 11:32 BST
+Nmap scan report for 192.168.0.1
+Host is up (0.0011s latency).
+
+PORT      STATE    SERVICE
+22/tcp    filtered ssh
+53/tcp    open     domain
+80/tcp    open     http
+443/tcp   open     https
+445/tcp   closed   microsoft-ds
+3001/tcp  closed   nessus
+5000/tcp  closed   upnp
+5050/tcp  closed   mmcc
+8080/tcp  filtered http-proxy
+8088/tcp  closed   radan-http
+8443/tcp  closed   https-alt
+9091/tcp  closed   xmltec-xmlmail
+32400/tcp closed   plex
+51413/tcp closed   unknown
+MAC Address: D8:33:B7:C5:4D:4B (Sagemcom Broadband SAS)
+
+Nmap scan report for 192.168.0.32
+Host is up (0.068s latency).
+
+PORT      STATE  SERVICE
+22/tcp    closed ssh
+53/tcp    closed domain
+80/tcp    closed http
+443/tcp   closed https
+445/tcp   closed microsoft-ds
+3001/tcp  closed nessus
+5000/tcp  closed upnp
+5050/tcp  closed mmcc
+8080/tcp  closed http-proxy
+8088/tcp  closed radan-http
+8443/tcp  closed https-alt
+9091/tcp  closed xmltec-xmlmail
+32400/tcp closed plex
+51413/tcp closed unknown
+MAC Address: AA:28:D5:3F:7A:88 (Unknown)
+
+Nmap scan report for 192.168.0.83
+Host is up (0.00090s latency).
+
+PORT      STATE  SERVICE
+22/tcp    open   ssh
+53/tcp    closed domain
+80/tcp    closed http
+443/tcp   closed https
+445/tcp   closed microsoft-ds
+3001/tcp  closed nessus
+5000/tcp  closed upnp
+5050/tcp  closed mmcc
+8080/tcp  open   http-proxy
+8088/tcp  closed radan-http
+8443/tcp  closed https-alt
+9091/tcp  closed xmltec-xmlmail
+32400/tcp closed plex
+51413/tcp closed unknown
+MAC Address: 60:22:32:4C:D7:AC (Ubiquiti)
+
+Nmap scan report for 192.168.0.90
+Host is up (0.019s latency).
+
+PORT      STATE  SERVICE
+22/tcp    closed ssh
+53/tcp    closed domain
+80/tcp    closed http
+443/tcp   closed https
+445/tcp   closed microsoft-ds
+3001/tcp  closed nessus
+5000/tcp  closed upnp
+5050/tcp  closed mmcc
+8080/tcp  closed http-proxy
+8088/tcp  closed radan-http
+8443/tcp  open   https-alt
+9091/tcp  closed xmltec-xmlmail
+32400/tcp closed plex
+51413/tcp closed unknown
+MAC Address: 14:C1:4E:1C:2F:4B (Google)
+
+Nmap scan report for 192.168.0.147
+Host is up (0.00021s latency).
+
+PORT      STATE    SERVICE
+22/tcp    open     ssh
+53/tcp    filtered domain
+80/tcp    open     http
+443/tcp   closed   https
+445/tcp   filtered microsoft-ds
+3001/tcp  filtered nessus
+5000/tcp  filtered upnp
+5050/tcp  filtered mmcc
+8080/tcp  filtered http-proxy
+8088/tcp  filtered radan-http
+8443/tcp  filtered https-alt
+9091/tcp  filtered xmltec-xmlmail
+32400/tcp filtered plex
+51413/tcp filtered unknown
+MAC Address: 34:5A:60:36:DC:42 (Unknown)
+
+Nmap scan report for 192.168.0.181
+Host is up (0.019s latency).
+
+PORT      STATE  SERVICE
+22/tcp    closed ssh
+53/tcp    closed domain
+80/tcp    closed http
+443/tcp   closed https
+445/tcp   closed microsoft-ds
+3001/tcp  closed nessus
+5000/tcp  closed upnp
+5050/tcp  closed mmcc
+8080/tcp  closed http-proxy
+8088/tcp  closed radan-http
+8443/tcp  closed https-alt
+9091/tcp  closed xmltec-xmlmail
+32400/tcp closed plex
+51413/tcp closed unknown
+MAC Address: C0:4B:24:49:8C:6C (Unknown)
+
+Nmap scan report for 192.168.0.187
+Host is up (0.064s latency).
+
+PORT      STATE  SERVICE
+22/tcp    closed ssh
+53/tcp    closed domain
+80/tcp    closed http
+443/tcp   closed https
+445/tcp   closed microsoft-ds
+3001/tcp  closed nessus
+5000/tcp  closed upnp
+5050/tcp  closed mmcc
+8080/tcp  closed http-proxy
+8088/tcp  closed radan-http
+8443/tcp  closed https-alt
+9091/tcp  closed xmltec-xmlmail
+32400/tcp closed plex
+51413/tcp closed unknown
+MAC Address: 76:0F:9B:43:64:F1 (Unknown)
+
+Nmap scan report for 192.168.0.197
+Host is up (0.00036s latency).
+
+PORT      STATE  SERVICE
+22/tcp    closed ssh
+53/tcp    closed domain
+80/tcp    closed http
+443/tcp   closed https
+445/tcp   closed microsoft-ds
+3001/tcp  closed nessus
+5000/tcp  closed upnp
+5050/tcp  closed mmcc
+8080/tcp  open   http-proxy
+8088/tcp  closed radan-http
+8443/tcp  closed https-alt
+9091/tcp  closed xmltec-xmlmail
+32400/tcp closed plex
+51413/tcp closed unknown
+MAC Address: 1C:86:9A:AA:8E:96 (Samsung Electronics)
+
+Nmap scan report for KIAPC (192.168.0.206)
+Host is up (0.00033s latency).
+
+PORT      STATE    SERVICE
+22/tcp    filtered ssh
+53/tcp    filtered domain
+80/tcp    filtered http
+443/tcp   filtered https
+445/tcp   open     microsoft-ds
+3001/tcp  filtered nessus
+5000/tcp  filtered upnp
+5050/tcp  filtered mmcc
+8080/tcp  filtered http-proxy
+8088/tcp  filtered radan-http
+8443/tcp  filtered https-alt
+9091/tcp  filtered xmltec-xmlmail
+32400/tcp filtered plex
+51413/tcp filtered unknown
+MAC Address: D8:5E:D3:0E:C7:06 (Giga-byte Technology)
+
+Nmap scan report for 192.168.0.212
+Host is up (0.0093s latency).
+
+PORT      STATE    SERVICE
+22/tcp    filtered ssh
+53/tcp    filtered domain
+80/tcp    filtered http
+443/tcp   filtered https
+445/tcp   filtered microsoft-ds
+3001/tcp  filtered nessus
+5000/tcp  filtered upnp
+5050/tcp  filtered mmcc
+8080/tcp  filtered http-proxy
+8088/tcp  filtered radan-http
+8443/tcp  filtered https-alt
+9091/tcp  filtered xmltec-xmlmail
+32400/tcp filtered plex
+51413/tcp filtered unknown
+MAC Address: 34:2E:B7:47:05:D1 (Intel Corporate)
+
+Nmap done: 10 IP addresses (10 hosts up) scanned in 4.13 seconds
