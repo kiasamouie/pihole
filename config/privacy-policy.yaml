@@ -25,6 +25,12 @@
 #   * EXACT domains only. No *.samsung.com / *.samsungcloudsolution.com style
 #     wildcards - those families contain app-store, auth, EPG, update and
 #     QBE infrastructure whose blockage is documented by the community.
+#     ONE documented exception: `kind: suffix` entries, permitted only when
+#     certificate-transparency + local traffic evidence proves the whole zone
+#     serves a single purpose (currently: the aibixby.com Bixby/AI-assistant
+#     family, see reports/09-voice-path-investigation.md). Suffix entries are
+#     enforced at the DNS layer (Pi-hole regex, group-scoped) with a resolved
+#     IP set as second layer; they never touch other profiles.
 #   * Every entry carries sources + confidence. Entries that appear only in
 #     our own capture still qualify (observed on THIS TV) but are marked so.
 #   * Domains in config/privacy-keep.yaml override everything (keep wins).
@@ -363,24 +369,58 @@ policies:
 
   voice:
     description: >
-      Bixby/voice-cloud infrastructure. In standard-no-voice and strict.
-      Blocking these endpoints intentionally breaks cloud voice recognition;
-      on-device functionality unaffected. NOTE: no real voice session was
-      ever captured, so these are infrastructure-level classifications
-      (persistent presence in every active session), not proven
-      transcript-upload endpoints. Only the two confirmed, locally observed
-      Bixby hosts are blocked - we do NOT wildcard *bixby/*voice/*assistant.
+      Samsung Bixby / AI-assistant cloud infrastructure. In standard-no-voice
+      and strict. Blocking these endpoints intentionally breaks cloud voice
+      recognition; normal apps/CDN are unaffected because the aibixby.com
+      family hosts nothing else (see below). v2 (2026-09-21, after the
+      Tokyo-weather regression R-001/R-002): the TV's live voice path was
+      found to be prdcore1-euw1-user.aibixby.com (Bixby EU user plane, AWS
+      eu-west-1 ELB), which the original two-host policy missed. The scoped
+      aibixby.com suffix below closes that gap. We still do NOT touch
+      bixbyllm.com / sbixby.com (no local evidence this TV uses them) or any
+      generic *voice/*assistant name.
     default: false
     entries:
+      # Scoped suffix policy (the documented `kind: suffix` exception).
+      # Evidence: crt.sh 2026-09-21 (83 unique names under aibixby.com -
+      # all Bixby user planes, ucs, provisioning/mgmt, oauth, partner
+      # services, LLM gateways; NO app-store/OTA/content infrastructure),
+      # plus local capture (TV resolves+connects to user-plane hosts on
+      # every voice use). Primary control = Pi-hole regex (group-scoped);
+      # `hosts:` are resolved for the second-layer nft IP set (keep-list
+      # IP collisions auto-excluded). New subdomains added by Samsung later
+      # are still stopped at the DNS layer by the regex.
+      - domain: aibixby.com
+        kind: suffix
+        tiers: [voice]
+        confidence: high
+        observed_locally: true
+        hosts:
+          - prdcore1-euw1-user.aibixby.com
+          - prd-euw1-user.aibixby.com
+          - prd-euw1-ucs.aibixby.com
+          - prd-euw1-bac.aibixby.com
+          - prd-euw1-pdss-sync.aibixby.com
+          - prd-use2-ucs.aibixby.com
+          - prd-use2-user.aibixby.com
+          - prd-use2-bhp-api.aibixby.com
+          - prd-apne2-ucs.aibixby.com
+          - prd-apne2-user.aibixby.com
+          - provisioning-use2.mgmt.aibixby.com
+          - bixby-client.aibixby.com
+          - bixby-developer-assets.aibixby.com
+        sources: [local-capture, crtsh-2026-09, hagezi, perflyst]
+        expected_breakage: "cloud Bixby voice/assistant intentionally broken (intended); no app/CDN impact - zone is Bixby-only per CT analysis"
+      # Kept as explicit exact entries (also covered by the suffix regex):
       - domain: prd-euw1-ucs.aibixby.com
         tiers: [voice]
-        confidence: medium
+        confidence: high
         observed_locally: true
         sources: [local-capture]
         expected_breakage: "cloud voice recognition stops (intended in standard-no-voice/strict)"
       - domain: provisioning-use2.mgmt.aibixby.com
         tiers: [voice]
-        confidence: medium
+        confidence: high
         observed_locally: true
         sources: [local-capture, marq24]
         expected_breakage: "voice service provisioning stops (intended in standard-no-voice/strict)"

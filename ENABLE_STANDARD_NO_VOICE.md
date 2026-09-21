@@ -11,13 +11,27 @@ DNS      192.168.0.128
 ```
 
 `standard-no-voice` = standard (ACR + advertising + high-confidence telemetry +
-DNS/DoT enforcement) **plus** blocking of the two confirmed Samsung/Bixby
-voice-cloud hosts. It intentionally breaks cloud voice recognition. It does
-**not** include the low-confidence strict telemetry or the DoH-IP set.
+DNS/DoT enforcement) **plus** blocking of Samsung's Bixby/AI-assistant cloud
+voice plane. Since v2 (2026-09-21, after the Tokyo-weather regression — see
+REGRESSIONS.md + reports/09) this means: the two confirmed Bixby exact hosts
+**plus the scoped `*.aibixby.com` suffix policy** (the TV's actual live voice
+path, `prdcore1-euw1-user.aibixby.com` et al., is inside that family). It
+intentionally breaks cloud voice recognition. It does **not** include the
+low-confidence strict telemetry or the DoH-IP set.
 
 Everything is pre-tested (mock netns + throwaway table + temporary Pi-hole
-group). Nothing here touches UFW, Docker, Plex, Samba, SSH or the invoice stack
-beyond what TVGuard already manages.
+group + full selftest 99/0). Nothing here touches UFW, Docker, Plex, Samba,
+SSH or the invoice stack beyond what TVGuard already manages.
+
+**If the policy is already live (v1) and you want v2**, the only action is a
+re-apply + voice-state reset:
+
+```bash
+cd /home/kia/dns
+sudo scripts/privacy-policy-apply.sh standard-no-voice   # re-resolves + re-renders + re-pushes (idempotent)
+sudo scripts/privacy-reset-tv-voice-state.sh             # expires any open .197<->voice-IP connections (per-TV only)
+sudo scripts/privacy-live-check.sh                       # must show 38 group entries (37 exact + 1 regex)
+```
 
 ---
 
@@ -45,12 +59,16 @@ sudo scripts/privacy-policy-apply.sh standard-no-voice
 ```
 
 **Expected output:**
-- a resolution summary: `standard-no-voice: 37 domains -> ~135 IPs` (exact IP
-  counts vary day-to-day — they are re-resolved every apply)
+- a resolution summary: `standard-no-voice: 37 domains -> ~164-172 IPs`
+  (exact IP counts vary day-to-day — they are re-resolved every apply)
 - `table ip tvguard` re-rendered with a `tv_privacy_blocked` set and the
   privacy/DoT drop rules (**no** `tv_doh_blocked` set — that is strict-only)
-- Pi-hole group `TVGuard-Privacy` created with 37 exact-domain denies, client
-  `192.168.0.197` attached
+- Pi-hole group `TVGuard-Privacy` with **38 entries: 37 exact-domain denies +
+  1 regex (the aibixby.com voice-family suffix)**, client `192.168.0.197`
+  attached
+- then run `sudo scripts/privacy-reset-tv-voice-state.sh` once, so no pre-
+  existing TV connection to a voice IP survives (it only touches .197's
+  conntrack entries toward the resolved voice IPs)
 
 The TV does not need to be touched. From this moment its traffic to the listed
 destinations is denied at both the firewall (IP) and Pi-hole (DNS) layer.
@@ -63,9 +81,10 @@ sudo scripts/privacy-live-check.sh
 
 **PASS looks like:** `tv_privacy_blocked` present, no DoH-IP set (correct for
 this profile), privacy drop rule present, DoT drop rule present, **no rule
-touches TCP/443 or UDP/443**, masquerade + DNS DNAT intact, all 37 group
-domains present, client .197 attached, health-check green. It ends by listing
-the physical TV tests only you can do (Step 5).
+touches TCP/443 or UDP/443**, masquerade + DNS DNAT intact, all 38 group
+entries present (37 exact + 1 regex — the new regex-presence line must say
+PASS), client .197 attached, health-check green. It ends by listing the
+physical TV tests only you can do (Step 5).
 
 ## Step 4 — Start the 30-minute safety watch
 
@@ -88,16 +107,22 @@ Follow `TV_MANUAL_TEST_CHECKLIST.md` in order: home screen → TV Plus/EPG →
 YouTube → Plex → Prime Video → Netflix → casting → app store → firmware check →
 Samsung account → **voice last**. Tests 1–10 must all PASS.
 
-## Step 6 — Confirm the intentional voice failure
+## Step 6 — Confirm the intentional voice failure (scientific version)
 
-Press the voice button and give a command (e.g. "open YouTube").
+Follow `VOICE_BLOCK_VERIFICATION.md`: run `sudo scripts/voice-proof-capture.sh`
+(one command, 7 minutes, on-screen countdown), then ask, in order:
 
-**Expected:** the cloud voice command **fails** (timeout / "can't reach voice
-service"). That is the policy working, not a bug. Everything else (remote,
-apps, playback) must continue to work.
+1. "What is the weather in Tokyo right now?" (decline location)
+2. "What is the weather in Sydney right now?"
+3. "What is the current price of Bitcoin?"
 
-If voice unexpectedly still works, or if anything in Step 5 failed, go to
-Step 8 first.
+**Expected:** all three **fail** to produce a fresh cloud answer (that is the
+policy working, not a bug), while remote, apps and playback keep working.
+Simple/local commands may still work — expected.
+
+If a cloud answer still succeeds, do NOT disable — report the capture
+directory name; the capture shows exactly which destination still got
+through and it gets added in the next iteration.
 
 ## Step 7 — Inspect blocked attempts
 

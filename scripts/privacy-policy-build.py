@@ -17,8 +17,13 @@ Source of truth: config/privacy-policy.yaml (deny) and config/privacy-keep.yaml
      answers for blocked domains.
   3. Applies keep-list overrides: an IP that is also used by a keep-list
      domain is removed from the deny sets (keep wins) and reported.
-  4. Writes data/privacy-policy/resolved.json (consumed by tvguard-apply.sh)
-     and data/privacy-policy/preview.md (human review).
+     Entries with `kind: suffix` (documented exception, see the YAML header)
+     are emitted as Pi-hole regex denies ("regexes") plus a resolved IP set
+     built from the entry's explicit `hosts:` list; a keep-list domain under
+     a suffix keeps the whole suffix out.
+  4. Writes data/privacy-policy/resolved.json (consumed by tvguard-apply.sh
+     for IPs and by privacy-policy-apply.sh for domains + regexes) and
+     data/privacy-policy/preview.md (human review).
 
 Nothing here is applied to the firewall or Pi-hole.
 
@@ -133,10 +138,29 @@ def main():
         return cache[d]
 
     def build_section(entries, label):
-        domains, ips, unresolved, kept_out = [], set(), [], []
+        domains, ips, unresolved, kept_out, regexes = [], set(), [], [], []
         for d, meta in entries:
             if d in keep_ips:
                 kept_out.append((d, "keep-domain override"))
+                continue
+            if (meta.get("kind") or "exact") == "suffix":
+                # Scoped single-purpose family: DNS-layer regex deny (primary)
+                # + IP set from the explicit host list (second layer).
+                if any(kd == d or kd.endswith("." + d) for kd in keep_ips):
+                    kept_out.append((d, "suffix contains keep-list domain(s) - whole family kept out"))
+                    continue
+                pattern = r"^(\S+\.)?" + re.escape(d) + r"\.?$"
+                regexes.append({"name": d, "pattern": pattern})
+                for host in [d] + [h.strip().lower() for h in (meta.get("hosts") or [])]:
+                    d_ips, ok = resolve_cached(host)
+                    if not ok and not d_ips:
+                        unresolved.append(host)
+                        continue
+                    for ip in d_ips:
+                        if ip in protected:
+                            kept_out.append((host, "IP %s shared with keep-list infrastructure" % ip))
+                        else:
+                            ips.add(ip)
                 continue
             d_ips, ok = resolve_cached(d)
             domains.append(d)
@@ -149,6 +173,7 @@ def main():
                 else:
                     ips.add(ip)
         return {"domains": sorted(domains),
+                "regexes": regexes,
                 "ips": sorted(ips),
                 "unresolved": unresolved,
                 "kept_out": [{"domain": d, "why": w} for d, w in kept_out]}
@@ -189,6 +214,11 @@ def main():
         lines = ["## %s" % name, ""]
         lines.append("- domains: %d | resolved unique IPs: %d | unresolved: %d | kept-out: %d"
                      % (len(sec["domains"]), len(sec["ips"]), len(sec["unresolved"]), len(sec["kept_out"])))
+        if sec["regexes"]:
+            lines.append("")
+            lines.append("Regex (suffix) denies - DNS layer, group-scoped:")
+            for r in sec["regexes"]:
+                lines.append("- `%s` (suffix %s)" % (r["pattern"], r["name"]))
         if sec["kept_out"]:
             lines.append("")
             lines.append("Kept out of the firewall set (keep-list wins):")

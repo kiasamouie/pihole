@@ -50,7 +50,9 @@ ROLLBACK.md             one-command firewall rollback + full removal
 REVIEW_BEFORE_BLOCKING.md  human review dataset (destinations by category)
 FINAL_BLOCKING_PLAN.md   what standard / standard-no-voice / strict block, keep, force, leave working
 TV_MANUAL_TEST_CHECKLIST.md  ordered physical TV tests with PASS/FAIL + diagnostics
+VOICE_BLOCK_VERIFICATION.md  the voice-block proof protocol (one command + 3 questions)
 ENABLE_STANDARD_NO_VOICE.md  step-by-step enablement guide for the recommended profile
+REGRESSIONS.md               failed security tests + fixes (R-001 Tokyo-weather, ...)
 MIGRATION_TO_DEDICATED_BOX.md  move this repo to the dedicated x86 box
 ```
 
@@ -85,6 +87,9 @@ MIGRATION_TO_DEDICATED_BOX.md  move this repo to the dedicated x86 box
 | `scripts/privacy-live-check.sh` | post-enable verification (server-side) + the physical TV tests you must run | sudo |
 | `scripts/privacy-watch.sh` | N-minute safety watch; `--auto-rollback` disables only the privacy layer on failure | sudo |
 | `scripts/tv-offline-reconnect-test.sh` | "store-while-offline → upload-on-reconnect" experiment (failsafe, temporary rule) | sudo |
+| `scripts/privacy-reset-tv-voice-state.sh` | after a voice-policy (re-)apply: expire the target TV's open connections to resolved voice IPs (per-TV only; never global) | sudo |
+| `scripts/voice-path-discovery.sh` | ~1 Hz recorder (snaplen-128 tcpdump headers + conntrack + DNS + counters) → `captures/voice-discovery/` | sudo |
+| `scripts/voice-proof-capture.sh` | one-command 7-min voice-block proof capture (120 s pre / 120 s active / 180 s post) with countdown | sudo |
 
 ## Fresh-machine setup (the future dedicated box)
 
@@ -109,9 +114,14 @@ sudo scripts/privacy-policy-disable.sh                   # full privacy rollback
 
 The policy is EXACT domains only (no Samsung wildcards), resolved via 8.8.8.8
 on every apply, with `config/privacy-keep.yaml` overriding all deny candidates
-whose IPs collide with essential infrastructure. It is scoped to the TVs in
-`applies_to` (currently the Samsung .197 only) and never touches the gateway
-path, UFW, Docker, or other clients.
+whose IPs collide with essential infrastructure. One documented exception:
+the voice tier carries a scoped `kind: suffix` entry for `aibixby.com` (the
+Bixby/AI-assistant cloud zone — CT analysis proves it is 100% Bixby
+infrastructure and contains no keep-list domain); it is enforced primarily at
+the DNS layer (group-scoped Pi-hole regex) with a resolved-IP set as second
+layer. See reports/09-voice-path-investigation.md. The policy is scoped to
+the TVs in `applies_to` (currently the Samsung .197 only) and never touches
+the gateway path, UFW, Docker, or other clients.
 
 ## Security notes
 
@@ -121,6 +131,7 @@ path, UFW, Docker, or other clients.
   table plus two `ufw route` rules, both removable in one command.
 - `etc-pihole/` and `captures/` contain query logs/session metadata (device +
   domain names). Git-ignored; treat as log data. `data/privacy-policy/`
-  (resolved ephemeral IPs) and `data/offline-reconnect/` are git-ignored too.
+  (resolved ephemeral IPs), `data/offline-reconnect/` and `research/tmp/`
+  (mined raw query history + resolution scratch) are git-ignored too.
 - No TLS interception, no custom CAs, no ARP tricks, no blanket 443/QUIC
   blocks — by design.

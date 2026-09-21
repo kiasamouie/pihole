@@ -119,16 +119,26 @@ sudo scripts/tvguard-status.sh                         # TVGuard mode + counters
 
 ## 11. Voice / Bixby  ← **expected to FAIL under standard-no-voice / strict**
 
-- **Do:** press the voice button (or say the wake phrase) and give a simple
-  voice command ("open YouTube").
-- **EXPECTED RESULT:** the cloud voice command **fails** (timeout,
-  "can't reach the voice service", or no response). This is **intentional** —
-  the two confirmed Bixby cloud hosts are blocked. On-device behaviour, the
-  remote, and all other functions must still work.
-- **If cloud voice still works:** the block is not in place — run
-  `sudo scripts/privacy-policy-status.sh` and
-  `sudo dmesg | grep TVGUARD-PRIVACY` (you should see drops to the aibixby IPs
-  when you try voice).
+Run the scientific version (one command + the three questions below):
+`sudo scripts/voice-proof-capture.sh` — full protocol in
+`VOICE_BLOCK_VERIFICATION.md`. Manual version:
+
+- **Do:** press the voice button and ask, in order (15–20 s apart):
+  1. "What is the weather in Tokyo right now?" (decline location)
+  2. "What is the weather in Sydney right now?"
+  3. "What is the current price of Bitcoin?"
+- **EXPECTED RESULT:** all three **fail** to return a fresh cloud answer
+  (timeout, "can't reach the voice service", or no response). This is
+  **intentional** — the whole Bixby voice plane is blocked (the confirmed
+  hosts plus the scoped `*.aibixby.com` family — see reports/09). On-device
+  behaviour, the remote, and all other functions must still work. Simple/local
+  voice commands may still work — expected.
+- **If a cloud answer still works:** do not disable — re-run the proof
+  capture and report the capture directory; it shows exactly which
+  destination slipped through for the next iteration. Also check
+  `sudo scripts/privacy-policy-status.sh` (expect 38 group entries incl. the
+  regex) and `sudo dmesg | grep TVGUARD-PRIVACY` (drops to the aibixby IPs
+  while you try voice).
 - **Diagnose:** `show-dns-activity.py` should show the aibixby domains
   returning blocked; `dmesg` should show `TVGUARD-PRIVACY DST=<aibixby IP>`
   events while you are speaking.
@@ -144,4 +154,5 @@ sudo scripts/tvguard-status.sh                         # TVGuard mode + counters
    report it; if the keep decision is right it goes into
    `config/privacy-keep.yaml` and the policy is re-applied.
 3. `sudo scripts/privacy-policy-apply.sh standard-no-voice`
+   `sudo scripts/privacy-reset-tv-voice-state.sh`   (expire stale voice flows; per-TV only)
    `sudo scripts/privacy-watch.sh 30 --auto-rollback`

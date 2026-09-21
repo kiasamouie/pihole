@@ -19,7 +19,9 @@
 #
 # What it proves (per profile):
 #   0. content assertions: senv == standard ∪ voice; strict ⊇ senv; strict-only
-#      representatives absent from senv; required domains present; DoH strict-only
+#      representatives absent from senv; required domains present; DoH strict-only;
+#      suffix (regex) entries: senv/strict carry the aibixby.com Bixby family,
+#      plain standard does not
 #   1. rendered privacy ruleset passes `nft -c`
 #   2. no rule touches TCP/443 or UDP/443 (HTTPS + QUIC stay free)
 #   3. mock TV -> blocked profile IP : dropped (TVGUARD-PT-PRIV log, DST match)
@@ -152,22 +154,40 @@ def yaml_sets():
     return std, senv, voice, strict, doh, doh_ok
 
 std, senv, voice, strict, doh, doh_ok = yaml_sets()
+
+def names_of(sec):
+    sec = sec or {}
+    return set(sec.get("domains", [])) | {r["name"] for r in (sec.get("regexes") or [])}
+
+def rx_names(sec):
+    return {r["name"] for r in ((sec or {}).get("regexes") or [])}
+
 exp = []
 exp.append((senv == std | voice,
             "senv == standard ∪ voice (set identity)",
             "senv != standard ∪ voice"))
-exp.append((set(d["standard"]["domains"]) == std - kept_names,
+exp.append((names_of(d["standard"]) == std - kept_names,
             "resolved.json standard domains == YAML standard (minus keep-overrides)",
             "resolved.json standard domain mismatch"))
-exp.append((set(d["standard-no-voice"]["domains"]) == senv - kept_names,
+exp.append((names_of(d["standard-no-voice"]) == senv - kept_names,
             "resolved.json standard-no-voice domains == YAML senv (minus keep-overrides)",
             "resolved.json senv domain mismatch"))
-exp.append((set(d["strict"]["domains"]) == strict - kept_names,
+exp.append((names_of(d["strict"]) == strict - kept_names,
             "resolved.json strict domains == YAML strict (minus keep-overrides)",
             "resolved.json strict domain mismatch"))
-exp.append((set(d.get("voice", {}).get("domains", [])) == voice,
+exp.append((names_of(d.get("voice")) == voice,
             "resolved.json voice reference == YAML voice entries",
             "resolved.json voice reference mismatch"))
+# suffix (regex) policy assertions - the aibixby.com Bixby voice family
+exp.append((rx_names(d["standard-no-voice"]) == {"aibixby.com"},
+            "senv carries exactly the aibixby.com suffix regex (voice v2)",
+            "senv suffix-regex set wrong: %s" % sorted(rx_names(d["standard-no-voice"]))))
+exp.append((not rx_names(d["standard"]),
+            "plain standard carries no suffix regex (voice must stay functional)",
+            "suffix regex leaked into standard: %s" % sorted(rx_names(d["standard"]))))
+exp.append(("aibixby.com" in rx_names(d["strict"]),
+            "strict carries the aibixby.com suffix regex",
+            "strict missing the aibixby.com suffix regex"))
 exp.append((senv <= strict, "strict ⊇ senv", "strict is missing senv domains"))
 strict_only_reps = ["2mdn.net", "nmetrics.samsung.com", "smetrics.samsung.com",
                     "samsungdm.com", "syncplusconfig.s3.amazonaws.com"]
@@ -416,21 +436,60 @@ else:
     if gid not in g:
         g.append(gid)
         req("PUT", "/api/clients/%s" % MOCK, {"client": MOCK, "groups": g})
-existing = set()
+# FTL stores domain rows GLOBALLY; groups are associations on the row, and
+# this FTL build has NO per-id group-update endpoint (verified: only
+# /api/domains, /{allow,deny}{,/exact,/regex}, :batchDelete). A name already
+# in the DB cannot be re-added to a second group without delete+re-add (a
+# transient deny gap on the LIVE policy - unacceptable in a test). Therefore:
+#   * names NOT in the global DB -> pushed into the temp group (row created
+#     there) and block-tested against the mock client;
+#   * names already in the DB (e.g. the real TVGuard-Privacy group is live)
+#     -> the temp group holds no copy, so the mock-client block test for those
+#     names is INCONCLUSIVE and reported as such (not a failure). The real
+#     rows are NEVER touched.
+global_by_name = {}
 offset = 0
 while True:
     code, res = req("GET", "/api/domains?limit=100&offset=%d" % offset)
     rows = res.get("domains") if isinstance(res, dict) else res
     if not isinstance(rows, list) or not rows: break
-    existing |= {str(d.get("domain", "")).lower() for d in rows}
+    for d in rows:
+        global_by_name.setdefault(str(d.get("domain", "")).lower(), d)
     if len(rows) < 100: break
     offset += 100
+existing = set(global_by_name)
 to_push = [d for d in domains if d.lower() not in existing]
 if to_push:
     code, res = req("POST", "/api/domains/deny/exact", {"domain": to_push, "groups": [gid]})
     if code not in (200, 201):
         print("BAD  domain push failed: %s" % res); raise SystemExit(0)
-print("OK   temp group %s created; %d deny domains pushed (%d pre-existing)" % (GN, len(to_push), len(domains) - len(to_push)))
+    print("OK   temp group %s: %d new rows pushed (of %d; %d already in global DB -> skipped)" % (GN, len(to_push), len(domains), len(domains) - len(to_push)))
+else:
+    print("INFO all %d profile domains already exist in the global DB (real group live?) - mock-client block tests below are inconclusive for them" % len(domains))
+regexes = [r["pattern"] for r in (resolved[PROF].get("regexes") or [])]
+# regex pattern strings are not domain names; only skip if the temp group
+# somehow already holds the pattern (rerun without cleanup)
+temp_group_rows = []
+offset = 0
+while True:
+    code, res = req("GET", "/api/domains?limit=100&offset=%d" % offset)
+    rows = res.get("domains") if isinstance(res, dict) else res
+    if not isinstance(rows, list) or not rows: break
+    for d in rows:
+        if gid in (d.get("groupIDs") or d.get("groups") or []):
+            temp_group_rows.append(str(d.get("domain", "")).lower())
+    if len(rows) < 100: break
+    offset += 100
+rx_new = [p for p in regexes if p.lower() not in set(temp_group_rows) and p.lower() not in existing]
+regex_pushed = bool(rx_new)
+if rx_new:
+    code, res = req("POST", "/api/domains/deny/regex", {"domain": rx_new, "groups": [gid]})
+    if code not in (200, 201):
+        print("BAD  regex push failed: %s" % res); raise SystemExit(0)
+    print("OK   %d regex (suffix) denies pushed to temp group" % len(rx_new))
+rx_global = [p for p in regexes if p.lower() in existing and p.lower() not in set(temp_group_rows)]
+if rx_global:
+    print("INFO %d regex (suffix) pattern(s) already in global DB (real group live) - temp group holds no copy, suffix mock-client test inconclusive for them" % len(rx_global))
 time.sleep(1)
 
 def host_dig(dom):
@@ -450,14 +509,19 @@ IPRE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
 def is_blocked(ans):
     return ans == "" or "0.0.0.0" in ans or "NXDOMAIN" in ans.upper()
 
-# pick a gravity-safe test domain (host baseline must be a real IP)
+# pick a gravity-safe test domain that the TEMP group actually holds
+# (only domains pushed into the temp group can be meaningfully block-tested
+# for the mock client; domains that exist only in the real group are skipped)
 test_dom = None
-for dom in domains:
+for dom in to_push:
     if host_dig(dom):
         test_dom = dom
         break
 if test_dom is None:
-    print("BAD  no gravity-safe test domain found (all blocked by baseline already)")
+    if to_push:
+        print("INFO no temp-group domain has a host-resolvable baseline - generic block test skipped")
+    else:
+        print("INFO temp group holds no fresh rows (all profile domains pre-exist globally) - generic block test inconclusive")
 else:
     ans = ns_dig(test_dom)
     if is_blocked(ans):
@@ -471,6 +535,8 @@ vdom = "prd-euw1-ucs.aibixby.com"
 hb = host_dig(vdom)
 if hb is None:
     print("INFO host baseline: %s already blocked by gravity (0.0.0.0) - voice-DNS result inconclusive either way" % vdom)
+elif vdom.lower() in existing:
+    print("INFO %s already exists in the global DB (real group live) - temp group holds no copy, mock-client test inconclusive (regex/suffix test below still applies)" % vdom)
 else:
     ans = ns_dig(vdom)
     if PROF == "standard":
@@ -484,6 +550,27 @@ else:
         else:
             print("BAD  voice domain %s unexpectedly resolves under %s: %s" % (vdom, PROF, ans))
 
+# suffix-regex behaviour: the user-plane host is covered ONLY by the
+# aibixby.com suffix regex (not by any exact entry)
+rvdom = "prdcore1-euw1-user.aibixby.com"
+rhb = host_dig(rvdom)
+if rhb is None:
+    print("INFO host baseline: %s already blocked by gravity - suffix-regex result inconclusive" % rvdom)
+elif not regex_pushed:
+    print("INFO suffix-regex test inconclusive (regex not freshly pushed to temp group this run)")
+else:
+    ans = ns_dig(rvdom)
+    if PROF == "standard":
+        if IPRE.match(ans.splitlines()[0]) if ans else False:
+            print("OK   suffix host %s STILL RESOLVES under standard (voice functional)" % rvdom)
+        else:
+            print("BAD  suffix host %s does not resolve under standard: %s" % (rvdom, ans or "empty"))
+    else:
+        if is_blocked(ans):
+            print("OK   suffix host %s blocked for mock client under %s via regex (answer: %s)" % (rvdom, PROF, ans or "empty"))
+        else:
+            print("BAD  suffix host %s unexpectedly resolves under %s: %s" % (rvdom, PROF, ans))
+
 # keep-domain must still resolve for the mock client
 kdom = "www.youtube.com"
 kb = host_dig(kdom)
@@ -496,15 +583,18 @@ else:
     else:
         print("BAD  keep domain %s does not resolve for mock client: %s" % (kdom, ans or "empty"))
 
-# cleanup: delete group domains, detach client, delete group
+# cleanup: delete only rows that belong solely to the temp group (rows shared
+# with other groups - e.g. the real TVGuard-Privacy - are never deleted),
+# then detach client and delete group.
 to_del = []
 offset = 0
 while True:
     code, res = req("GET", "/api/domains?limit=100&offset=%d" % offset)
-    rows = res.get("domains") if isinstance(res, dict) else []
+    rows = res.get("domains") if isinstance(res, dict) else res
     if not isinstance(rows, list) or not rows: break
     for d in rows:
-        if gid in (d.get("groupIDs") or d.get("groups") or []):
+        gids = set(d.get("groupIDs") or d.get("groups") or [])
+        if gids == {gid}:
             to_del.append({"item": d["domain"], "type": d.get("type", "deny"), "kind": d.get("kind", "exact")})
     if len(rows) < 100: break
     offset += 100

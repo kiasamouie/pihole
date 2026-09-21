@@ -117,13 +117,15 @@ else:
 PYEOF
 
 echo
-echo "== verification =="
-if nft list table ip tvguard 2>/dev/null | grep -q "tv_privacy_blocked\|tv_doh_blocked"; then
+"== verification =="
+# capture to a var first: `nft ... | grep -q` SIGPIPEs nft under set -o pipefail
+T=$(nft list table ip tvguard 2>/dev/null)
+if echo "$T" | grep -q "tv_privacy_blocked\|tv_doh_blocked"; then
   echo "  WARN: privacy set still present in table ip tvguard" >&2
 else
   echo "  OK: no privacy sets in table ip tvguard"
 fi
-if nft list table ip tvguard 2>/dev/null | grep -q masquerade; then
+if echo "$T" | grep -q masquerade; then
   echo "  OK: masquerade (NAT) still present - TV gateway path intact"
 else
   echo "  WARN: masquerade missing - check TVGuard state" >&2

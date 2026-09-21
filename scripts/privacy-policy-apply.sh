@@ -21,9 +21,12 @@
 #      mode (monitor), NAT/masquerade and the DNS-bypass DNAT are untouched;
 #      new DROP sets (tv_privacy_blocked, tv_doh_blocked) and the DoT:853
 #      drop are added for the target TVs only.
-#   3. Pushes the tier's domains into the dedicated Pi-hole group
-#      "TVGuard-Privacy" (created if missing) scoped to the applies_to
-#      clients only (Samsung .197 in the current config).
+#   3. Pushes the tier's exact-domain denies AND regex (suffix) denies into
+#      the dedicated Pi-hole group "TVGuard-Privacy" (created if missing)
+#      scoped to the applies_to clients only (Samsung .197 in the current
+#      config). Regex entries come from `kind: suffix` policy entries (see
+#      config/privacy-policy.yaml header) and are the primary control for
+#      scoped families like the Bixby aibixby.com voice plane.
 #
 # It NEVER: flushes nftables/iptables, touches UFW or Docker, changes TVGuard
 # monitor mode, enables DHCP, or blocks anything outside the target TVs.
@@ -87,6 +90,7 @@ _tv = os.environ.get("PRIVACY_TARGETS", "").split()
 targets = _tv if _tv else [str(x) for x in (doc.get("applies_to") or [])]
 resolved = json.load(open(os.path.join(ROOT, "data", "privacy-policy", "resolved.json")))
 domains = resolved[TIER]["domains"]
+regexes = [r["pattern"] for r in (resolved[TIER].get("regexes") or [])]
 print("  targets (applies_to): %s" % ", ".join(targets))
 
 SID = None
@@ -162,6 +166,14 @@ if to_push:
     if code not in (200, 201):
         sys.exit("domain push failed: %s" % res)
 print("  pushed %d exact-domain denies to %s (%d already present)" % (len(to_push), GROUP_NAME, skipped))
+# regex (suffix-family) denies - e.g. the aibixby.com Bixby voice plane
+# (case-insensitive compare: patterns contain uppercase classes like \S)
+rx_push = [p for p in regexes if p.lower() not in existing]
+if rx_push:
+    code, res = req("POST", "/api/domains/deny/regex", {"domain": rx_push, "groups": [gid]})
+    if code not in (200, 201):
+        sys.exit("regex push failed: %s" % res)
+print("  pushed %d regex denies to %s (%d already present)" % (len(rx_push), GROUP_NAME, len(regexes) - len(rx_push)))
 PYEOF
 
 echo

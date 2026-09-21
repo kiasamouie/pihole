@@ -36,10 +36,12 @@ strict              = ALL entries (superset) + DoH endpoint IP set
 | Pi-hole group `TVGuard-Privacy` | exact-domain denies pushed to a dedicated group; only the `applies_to` clients are attached | only attached clients |
 | keep-list | any deny IP that collides with a keep-list IP is removed from the firewall set; the keep list is never pushed to the deny group | global safety net |
 
-Current resolution (2026-09-21 re-resolve, via 8.8.8.8): **standard 35 domains →
-129 IPs; standard-no-voice 37 domains → 135 IPs; strict 51 domains → 171 IPs;
-DoH 8 domains → 15 IPs. 0 unresolved.** (Exact IP counts drift with normal DNS
-changes — they are re-resolved on every apply; domain counts are stable.)
+Current resolution (2026-09-21 v2 re-resolve, via 8.8.8.8): **standard 35
+domains → 123 IPs; standard-no-voice 37 domains + 1 suffix regex → 164 IPs
+(live set 172 after the 15:51Z re-apply, incl. the 3 Bixby user-plane ELB
+IPs); strict 51 domains + suffix → 200 IPs; DoH 8 domains → 15 IPs. 0
+unresolved.** (Exact IP counts drift with normal DNS changes — they are
+re-resolved on every apply; domain counts are stable.)
 
 Two important resolution notes:
 
@@ -103,17 +105,28 @@ STANDARD will also, structurally:
 
 ## 1b. STANDARD-NO-VOICE (the recommended profile)
 
-`standard-no-voice` = everything in §1 **plus** the confirmed Bixby/voice-cloud
-hosts — and nothing else. It is `standard + 2 voice domains` (verified by an
-automated assertion in the selftest), NOT an alias of strict.
+`standard-no-voice` = everything in §1 **plus** Samsung's Bixby/AI-assistant
+cloud voice plane — and nothing else. It is `standard + voice tier` (verified
+by an automated assertion in the selftest), NOT an alias of strict.
 
-STANDARD-NO-VOICE WILL BLOCK (37 exact domains, ~135 IPs on current resolution):
+**v2 (2026-09-21, after the Tokyo-weather regression — see REGRESSIONS.md and
+reports/09):** the TV's live voice path turned out to be the Bixby EU user
+plane `prdcore1-euw1-user.aibixby.com`, which v1 (2 exact hosts) did not
+cover. The voice tier now carries one documented **scoped suffix policy**,
+`aibixby.com` (the project's only `kind: suffix` entry — CT analysis proves
+the zone is 100% Bixby infrastructure; no keep-list domain lives in it),
+enforced at the DNS layer (Pi-hole regex, group-scoped) with a resolved-IP
+set as second layer.
+
+STANDARD-NO-VOICE WILL BLOCK (37 exact domains + 1 suffix regex → 38 group
+entries; ~164–172 IPs on current resolution, drifts with DNS):
 
 | Domain | Class | Note |
 |--------|-------|------|
 | (all 35 domains from §1: 17 ACR + 10 advertising + 8 high-conf telemetry) | ACR/ads/telemetry | unchanged from §1 |
-| prd-euw1-ucs.aibixby.com | voice-related | **observed on our TV**; cloud voice endpoint; intentional breakage |
+| prd-euw1-ucs.aibixby.com | voice-related | **observed on our TV**; Bixby user-command service; intentional breakage |
 | provisioning-use2.mgmt.aibixby.com | voice-related | **observed**; voice service provisioning; intentional breakage |
+| **`*.aibixby.com` (suffix regex)** | voice-related | **the TV's actual live voice plane** (prdcore1-euw1-user et al., AWS eu-west-1); covers all present+future Bixby subdomains at the DNS layer; IP set covers the 13 enumerated hosts' resolved IPs (keep-collisions auto-excluded) |
 
 STANDARD-NO-VOICE WILL NOT BLOCK (explicitly excluded from this profile):
 - the 14 low-confidence strict-only telemetry domains from §5
@@ -137,9 +150,12 @@ Samsung account + push, firmware/OTA updates, normal HTTPS (TCP 443),
 QUIC (UDP 443), all other household devices (policy scoped to .197 only).
 
 STANDARD-NO-VOICE WILL INTENTIONALLY BREAK:
-- Samsung/Bixby **cloud voice** (voice button commands, wake-word cloud
-  processing). On-device functionality and everything else are unaffected.
-  No *bixby/*voice/*assistant wildcard exists — only the two confirmed hosts.
+- Samsung/Bixby **cloud voice** (voice button commands, cloud-based answers
+  like "weather in Tokyo"). On-device functionality and everything else are
+  unaffected. The only wildcard in the entire policy is the scoped
+  `*.aibixby.com` suffix (Bixby-only zone per CT analysis); there is no
+  *bixbyllm/*sbixby (no local use observed), no *voice/*assistant name
+  matching, and no AWS/CloudFront/Google wildcard anywhere.
 
 ## 2. STANDARD WILL NOT BLOCK (selected from privacy-keep.yaml — full file is the source of truth)
 
@@ -219,7 +235,7 @@ imported - most entries would be irrelevant and some are shared infrastructure).
 | Bucket | Count | Where |
 |--------|-------|-------|
 | BLOCK (standard) | 35 domains / 129 IPs | §1 |
-| BLOCK (standard-no-voice) | 37 domains / 135 IPs (= 35 + 2 voice) | §1b |
+| BLOCK (standard-no-voice) | 37 domains + 1 suffix regex (38 entries) / ~164–172 IPs (= 35 + 2 voice hosts + aibixby.com family) | §1b |
 | BLOCK (strict adds) | 14 low-conf domains + 15 DoH IPs | §5, §6 |
 | KEEP (documented) | ~30 domains / ~100 protected IPs | §2 (privacy-keep.yaml) |
 | OPTIONAL STRICT (low-conf telemetry) | 14 domains | §5 (only in strict) |

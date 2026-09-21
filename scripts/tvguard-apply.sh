@@ -40,6 +40,11 @@ ROOT="$(dirname "$SCRIPT_DIR")"
   echo "ERROR: LAN_INTERFACE, LAN_SUBNET and TVS must be set in config" >&2; exit 4
 }
 
+# Testability override: TGUARD_TVS replaces the TV list in the rendered table
+# (used by throwaway-table mock cycles, e.g. TGUARD_TABLE=tvguard-dry).
+# When set, the UFW route-allow loop below is SKIPPED as well, so a dry
+# table never touches the real UFW state or protects/drops real client IPs.
+
 # Egress interface: one-arm -> the LAN NIC (upstream hub is on the same segment);
 # dual-nic  -> the WAN NIC.
 if [ "${MODE}" = "dualnic-gateway" ]; then
@@ -245,6 +250,9 @@ if nft list table ip "$TGUARD_TABLE" >/dev/null 2>&1; then
 fi
 nft -f "$NFT_FILE"
 
+UFW_LOOP=1
+[ -n "${TGUARD_TVS:-}" ] && UFW_LOOP=0
+
 # --- UFW forward allowance (per TV) -------------------------------------------
 # CRITICAL: an ACCEPT verdict in our base chain (priority -150) does NOT stop
 # the packet from being evaluated by the later `ip filter FORWARD` base chain
@@ -255,6 +263,7 @@ nft -f "$NFT_FILE"
 # which lands in `ufw-user-forward` (evaluated before the policy drop).
 # We add exactly one such rule per selected TV and remove exactly those on
 # disable. Nothing else in UFW/Docker is touched.
+if [ "$UFW_LOOP" = "1" ]; then
 for tv in $TVS; do
   if iptables -t filter -S ufw-user-forward 2>/dev/null | grep -E -q -- "-s $tv(/32)? -j ACCEPT"; then
     echo "  ufw route rule present: $tv"
@@ -266,6 +275,9 @@ for tv in $TVS; do
     fi
   fi
 done
+else
+  echo "  (TGUARD_TVS set: UFW route-allow loop skipped - dry/test table)"
+fi
 
 # --- Sysctls (baseline captured so disable can restore) ----------------------
 # Capture baseline once (don't clobber an existing baseline).
@@ -293,6 +305,8 @@ net.ipv4.conf.$LAN_INTERFACE.send_redirects=0
 EOF
 
 # --- Persist mode -------------------------------------------------------------
+# (skipped for dry/test tables - they must not rewrite the real state file)
+if [ -z "${TGUARD_TVS:-}" ]; then
 {
   echo "MODE=$MODE"
   echo "APPLIED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -300,6 +314,9 @@ EOF
   echo "TVS=$TVS"
   echo "UFW_ROUTE_RULES=managed per TV via 'ufw route allow from <tv> to any'"
 } > "$STATE_FILE"
+else
+  echo "  (TGUARD_TVS set: state file not written - dry/test table)"
+fi
 
 # Refresh the privacy-state file only if it exists (we never enable privacy
 # from this script - that is privacy-policy-apply.sh's job). This keeps the

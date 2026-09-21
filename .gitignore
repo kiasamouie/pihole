@@ -26,6 +26,9 @@ data/privacy-policy/
 # Offline-reconnect experiment output (runtime captures)
 data/offline-reconnect/
 
+# Mined raw DNS history + resolution scratch (contains raw query logs - never commit)
+research/tmp/
+
 # Python bytecode
 __pycache__/
 *.pyc

@@ -17,8 +17,10 @@ fi
 
 echo
 echo "=== nftables (privacy part of table ip tvguard) ==="
-if nft list table ip tvguard 2>/dev/null | grep -q "tv_privacy_blocked\|tv_doh_blocked"; then
-  nft list table ip tvguard | sed -n '/tv_privacy_blocked/,/}/p;/tv_doh_blocked/,/}/p'
+# capture to a var first: `nft ... | grep -q` SIGPIPEs nft under set -o pipefail
+T=$(nft list table ip tvguard 2>/dev/null)
+if echo "$T" | grep -q "tv_privacy_blocked\|tv_doh_blocked"; then
+  echo "$T" | sed -n '/tv_privacy_blocked/,/}/p;/tv_doh_blocked/,/}/p'
   nft list chain ip tvguard forward 2>/dev/null | grep -E "PRIVACY|DOH|DOT" || true
 else
   echo "(no privacy sets present - firewall privacy layer OFF)"

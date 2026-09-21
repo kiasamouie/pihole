@@ -79,11 +79,21 @@ clients = req("GET", "/api/clients", None, sid).get("clients", [])
 attached = [c.get("client") for c in clients if gid in c.get("groups", [])]
 print("  attached clients: %s" % (", ".join(attached) or "none"))
 resolved = json.load(open(os.path.join(ROOT, "data", "privacy-policy", "resolved.json")))
-missing = [d for d in resolved[TIER]["domains"] if d not in mine]
+mine_names = set(mine)
+missing = [d for d in resolved[TIER]["domains"] if d not in mine_names]
 if missing:
     print("  WARN: %d resolved domains not found in group: %s" % (len(missing), ", ".join(missing[:5])))
 else:
     print("  PASS: all tier domains present in group")
+rx = resolved[TIER].get("regexes") or []
+if not rx:
+    print("  (no regex/suffix entries in this tier - nothing to check)")
+else:
+    rx_missing = [r["pattern"] for r in rx if r["pattern"] not in mine_names]
+    if rx_missing:
+        print("  WARN: %d regex denies not found in group: %s" % (len(rx_missing), ", ".join(rx_missing)))
+    else:
+        print("  PASS: all %d regex (suffix-family) denies present in group" % len(rx))
 PYEOF
 
 echo
