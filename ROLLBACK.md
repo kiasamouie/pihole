@@ -1,12 +1,54 @@
-# ROLLBACK — TVGuard + Pi-hole PoC (v2)
+# ROLLBACK — TVGuard + Privacy Policy + Pi-hole PoC (v3)
 
 Everything here affects **only** this project's footprint: the `tvguard`
-nftables table, the two per-TV `ufw-user-forward` rules, two sysctls, the
-`tvguard` systemd unit, and the Pi-hole compose stack. It never touches
-Plex, Samba, Transmission, SSH, the invoice containers, the Hub, or any
-pre-existing firewall rule. No command below flushes a firewall or resets UFW.
+nftables table (including the optional privacy sets it renders), the two
+per-TV `ufw-user-forward` rules, two sysctls, the `tvguard` systemd unit, the
+Pi-hole compose stack, and the `TVGuard-Privacy` Pi-hole group. It never
+touches Plex, Samba, Transmission, SSH, the invoice containers, the Hub, or
+any pre-existing firewall rule. No command below flushes a firewall or resets
+UFW.
+
+Rollback ladder (use the narrowest that fits):
+
+| Level | Command | Removes |
+|-------|---------|---------|
+| Privacy only | `sudo scripts/privacy-policy-disable.sh` | deny sets + DoT rules + Pi-hole group; keeps NAT/gateway/DNS/monitor mode |
+| TVGuard only | `sudo scripts/tvguard-disable.sh` | whole one-arm gateway (NAT, DNS DNAT, monitor) incl. privacy layer |
+| Pi-hole only | `docker compose stop pihole` | DNS service; keeps TVGuard (falls back to redirect on next apply) |
+| Everything | R0 + R4/R5 below | full project footprint |
 
 ---
+
+## R0a — Privacy policy: ONE-COMMAND rollback (keep the gateway)
+
+Use this when privacy blocking is ON and you want the TV's Internet path
+totally normal again **without** tearing down the gateway:
+
+```bash
+cd /home/kia/dns && sudo scripts/privacy-policy-disable.sh
+```
+
+It removes **only**:
+
+| Removed | Mechanism |
+|---|---|
+| `tv_privacy_blocked` / `tv_doh_blocked` sets + privacy/DoT drop rules | re-render of `table ip tvguard` with privacy state `off` — NAT, masquerade, DNS-bypass DNAT, monitor mode, UFW route rules all verified still present afterwards |
+| Pi-hole group `TVGuard-Privacy` + its deny domains + client attachments | `POST /api/groups:batchDelete` + `POST /api/domains:batchDelete` (v6 API); other groups untouched |
+| state file `/var/lib/tvguard/privacy-state` | rewritten to `PRIVACY=off` |
+
+The TV keeps its full Internet path (it never lost it — disabling only
+removes the deny rules). No TV-side change needed. The disable script is
+idempotent: running it while already off is a no-op that re-verifies state.
+
+Explicitly NOT touched: UFW, Docker, iptables/nftables outside `ip tvguard`,
+the Pi-hole stack itself, gravity baseline, other Pi-hole groups, Plex, Samba.
+
+Verify:
+
+```bash
+sudo scripts/privacy-policy-status.sh
+# expect: PRIVACY=off, "(no privacy sets present)", "(group absent ...)"
+```
 
 ## R0 — TVGuard firewall/gateway: ONE-COMMAND emergency rollback
 
@@ -94,9 +136,10 @@ docker rmi pihole/pihole:2026.09.0 2>/dev/null
 # optional: remove the diagnostic packages this project added
 sudo apt-get remove -y arp-scan nmap avahi-utils conntrack tcpdump
 ```
-Optionally remove `captures/` (session recordings, git-ignored) and
-`reports/raw/` artefacts you no longer want. The repo itself can then be
-deleted; nothing on the live network depends on it anymore.
+Optionally remove `captures/` (session recordings, git-ignored),
+`data/privacy-policy/` and `data/offline-reconnect/` (generated runtime data,
+git-ignored), and `reports/raw/` artefacts you no longer want. The repo
+itself can then be deleted; nothing on the live network depends on it anymore.
 
 ## L5 — Revert anything the staged rollout changed on the Hub
 

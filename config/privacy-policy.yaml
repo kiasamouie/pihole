@@ -1,0 +1,447 @@
+#
+# TVGuard privacy policy - source of truth for Samsung-TV privacy blocking.
+#
+# This file is the ONLY place deny decisions live. scripts/privacy-policy-
+# build.py resolves the domains to IPs (via an external resolver, NOT the
+# local Pi-hole) and emits data/privacy-policy/resolved.json; scripts/
+# tvguard-apply.sh then renders the nftables part and privacy-policy-apply.sh
+# pushes the domain part into the dedicated Pi-hole group "TVGuard-Privacy".
+#
+# Tiers
+#   standard : ACR + advertising + high-confidence telemetry + DNS/DoT
+#              enforcement. Bixby/voice stays functional.
+#   strict   : everything in standard + voice/Bixby cloud + lower-confidence
+#              telemetry + known-DoH-endpoint IP blocking.
+#              NOTE: strict intentionally breaks cloud voice recognition.
+#
+# Rules followed when building this list (see reports/07 and FINAL_BLOCKING_PLAN.md):
+#   * EXACT domains only. No *.samsung.com / *.samsungcloudsolution.com style
+#     wildcards - those families contain app-store, auth, EPG, update and
+#     QBE infrastructure whose blockage is documented by the community.
+#   * Every entry carries sources + confidence. Entries that appear only in
+#     our own capture still qualify (observed on THIS TV) but are marked so.
+#   * Domains in config/privacy-keep.yaml override everything (keep wins).
+#
+applies_to:
+  - "192.168.0.197"      # Samsung QE65Q75CATXXU - first target
+  # 192.168.0.90 (Google TV) is deliberately NOT included: it still uses the
+  # Hub as gateway. Add it here only once it is also pointed at .128.
+
+updated: "2026-09-21"
+version: 1
+
+policies:
+
+  acr:
+    description: >
+      Samsung Automatic Content Recognition (viewing recognition). IMC 2024
+      (SafeNetIoT/ACR) proves this is Shazam-like content matching sent from
+      the TV itself; their experiments show opting out STOPS the ACR network
+      traffic, and it works even when the TV is used as a dumb display.
+      Blocking is the reliable, verifiable control. No impact on playback.
+    default: false
+    entries:
+      - domain: acr0.samsungcloudsolution.com
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        sources: [safenetiot-imc2024, hagezi, perflyst, blocklistproject, marq24, fightback]
+        expected_breakage: "none - ACR viewing-recognition only"
+      - domain: acr-eu-prd.samsungcloud.tv
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        sources: [safenetiot-imc2024, hagezi]
+        expected_breakage: "none - EU/UK regional ACR endpoint (our region)"
+      - domain: acr-us-prd.samsungcloud.tv
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        sources: [safenetiot-imc2024, hagezi]
+        expected_breakage: "none - US regional ACR endpoint (regional completeness)"
+      - domain: acr-au-prd.samsungcloud.tv
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi]
+        expected_breakage: "none - regional ACR endpoint (regional completeness)"
+      - domain: acr-br-prd.samsungcloud.tv
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi]
+        expected_breakage: "none - regional ACR endpoint (regional completeness)"
+      - domain: acr-ca-prd.samsungcloud.tv
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi]
+        expected_breakage: "none - regional ACR endpoint (regional completeness)"
+      - domain: acr-in-prd.samsungcloud.tv
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi]
+        expected_breakage: "none - regional ACR endpoint (regional completeness)"
+      - domain: acr-kr-prd.samsungcloud.tv
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi]
+        expected_breakage: "none - regional ACR endpoint (regional completeness)"
+      - domain: acr-mx-prd.samsungcloud.tv
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi]
+        expected_breakage: "none - regional ACR endpoint (regional completeness)"
+      - domain: acr-nz-prd.samsungcloud.tv
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi]
+        expected_breakage: "none - regional ACR endpoint (regional completeness)"
+      - domain: log-config.samsungacr.com
+        tiers: [standard]
+        confidence: high
+        observed_locally: true
+        sources: [local-capture, blocklistproject, safenetiot-imc2024]
+        expected_breakage: "none - ACR configuration retrieval"
+      - domain: log-ingestion.samsungacr.com
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        sources: [perflyst, safenetiot-imc2024]
+        expected_breakage: "none - US ACR log ingestion"
+      - domain: log-ingestion-eu.samsungacr.com
+        tiers: [standard]
+        confidence: high
+        observed_locally: true
+        sources: [local-capture, perflyst, safenetiot-imc2024]
+        expected_breakage: "none - EU/UK ACR log ingestion (seen in all 5 active sessions)"
+      - domain: log-1.samsungacr.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [perflyst, blocklistproject, marq24]
+        expected_breakage: "none - ACR log shard"
+      - domain: log-2.samsungacr.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [perflyst, blocklistproject, marq24]
+        expected_breakage: "none - ACR log shard"
+      - domain: log-3.samsungacr.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [perflyst, marq24]
+        expected_breakage: "none - ACR log shard"
+      - domain: targeted-config-test.samsungacr.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [perflyst, blocklistproject, marq24]
+        expected_breakage: "none - ACR test configuration"
+
+  advertising:
+    description: >
+      Ad delivery/exchange infrastructure observed on this TV or documented
+      for Samsung. Blocking removes ads/personalised ad data, not content.
+      No broad Google domains; youtube/gstatic/googlevideo content paths are
+      untouched (see privacy-keep.yaml).
+    default: false
+    entries:
+      - domain: googleads.g.doubleclick.net
+        tiers: [standard]
+        confidence: high
+        observed_locally: true
+        sources: [local-capture, perflyst, fightback]
+        expected_breakage: "none - ad serving only (observed during YouTube/home)"
+      - domain: static.doubleclick.net
+        tiers: [standard]
+        confidence: high
+        observed_locally: true
+        sources: [local-capture, blocklistproject]
+        expected_breakage: "none - ad static assets"
+      - domain: tvx.adgrx.com
+        tiers: [standard]
+        confidence: high
+        observed_locally: true
+        sources: [local-capture, perflyst, blocklistproject, fightback]
+        expected_breakage: "menu-bar ads disappear (Perflyst #112: tested, no breakage)"
+      - domain: catalyst.adgrx.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: true
+        sources: [local-capture]
+        expected_breakage: "none expected - ad exchange (single source: our capture)"
+      - domain: rtb.adgrx.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: true
+        sources: [local-capture]
+        expected_breakage: "none expected - ad exchange (single source: our capture)"
+      - domain: rtb-config.samsungads.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: true
+        sources: [local-capture]
+        expected_breakage: "none expected - Samsung ad config (single source: our capture)"
+      - domain: tvp-ads-log.samsungads.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: true
+        sources: [local-capture]
+        expected_breakage: "none expected - Samsung TV+ ad logging (single source: our capture)"
+      - domain: ad.samsungadhub.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [perflyst, marq24]
+        expected_breakage: "none expected - Samsung ad hub"
+      - domain: rd.samsungadhub.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [perflyst, marq24]
+        expected_breakage: "none expected - Samsung ad hub"
+      - domain: samsungtv-d.openx.net
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi, fightback]
+        expected_breakage: "none expected - OpenX ad network for Samsung TV"
+      - domain: 2mdn.net
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [perflyst, fightback]
+        expected_breakage: "LOW RISK ACCEPTED: shared Google ad CDN - may affect some third-party ad rendering"
+
+  telemetry:
+    description: >
+      Non-essential diagnostics/telemetry. Standard = observed-on-this-TV or
+      2+ list agreement; strict adds lower-confidence Samsung diagnostic
+      endpoints. Crash reporting and firmware/security paths are NOT included
+      here (see privacy-keep.yaml for the firmware/update hosts).
+    default: false
+    entries:
+      - domain: qoe.samsungcloud.tv
+        tiers: [standard]
+        confidence: medium
+        observed_locally: true
+        sources: [local-capture]
+        expected_breakage: "none expected - QoE (quality-of-experience) diagnostics"
+      - domain: nrdp.logs.netflix.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: true
+        sources: [local-capture]
+        expected_breakage: "none expected - Netflix RDP telemetry host (playback uses other paths)"
+      - domain: eligibility-panelresearch.googlevideo.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: true
+        sources: [local-capture]
+        expected_breakage: "none expected - Google research-panel eligibility host"
+      - domain: devicelog.samsungcloudsolution.net
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi, fightback]
+        expected_breakage: "none expected - Samsung device log upload"
+      - domain: prderrordumphsm.samsungcloudsolution.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi, perflyst]
+        expected_breakage: "crash-detail reports to Samsung stop; playback unaffected"
+      - domain: notice.samsungcloudsolution.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [perflyst, blocklistproject, marq24]
+        expected_breakage: "in-TV Samsung notification popups may stop"
+      - domain: noticecdn.samsungcloudsolution.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [perflyst, blocklistproject, marq24]
+        expected_breakage: "in-TV Samsung notification popups may stop"
+      - domain: noticefile.samsungcloudsolution.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [perflyst, blocklistproject, marq24]
+        expected_breakage: "in-TV Samsung notification popups may stop"
+      - domain: oempprd.samsungcloudsolution.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [perflyst, blocklistproject, marq24]
+        expected_breakage: "unknown - OEM provisioning/params host"
+      - domain: oempprd.samsungcloudsolution.net
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [perflyst, marq24]
+        expected_breakage: "unknown - OEM provisioning/params host"
+      - domain: fkp.samsungcloudsolution.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [perflyst, marq24]
+        expected_breakage: "unknown - Samsung service host"
+      - domain: fkp.samsungcloudsolution.net
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [perflyst, marq24]
+        expected_breakage: "unknown - Samsung service host"
+      - domain: vdterms.samsungcloudsolution.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [perflyst, blocklistproject, marq24]
+        expected_breakage: "unknown - video-terms/config host"
+      - domain: prov.samsungcloudsolution.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [perflyst, marq24]
+        expected_breakage: "unknown - provisioning host"
+      - domain: sas.samsungcloudsolution.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [perflyst, blocklistproject, marq24]
+        expected_breakage: "unknown - Samsung service host"
+      - domain: samsungdm.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [hagezi, fightback]
+        expected_breakage: "remote-diagnostics channel stops; normal use unaffected"
+      - domain: nmetrics.samsung.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [hagezi, fightback]
+        expected_breakage: "unknown - Samsung metrics host"
+      - domain: smetrics.samsung.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [hagezi, fightback]
+        expected_breakage: "unknown - Samsung metrics host"
+      - domain: event-tracking.samsung.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [hagezi, fightback]
+        expected_breakage: "unknown - Samsung event tracking host"
+      - domain: syncplusconfig.s3.amazonaws.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [perflyst, blocklistproject, marq24]
+        expected_breakage: "Samsung Sync+ companion app config stops"
+      - domain: vd.emp.prd.s3.amazonaws.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [perflyst, marq24]
+        expected_breakage: "unknown - video measurement bucket"
+
+  voice:
+    description: >
+      Bixby/voice-cloud infrastructure. STRICT ONLY. Blocking these endpoints
+      intentionally breaks cloud voice recognition; on-device functionality
+      unaffected. NOTE: no real voice session was ever captured, so these are
+      infrastructure-level classifications (persistent presence in every
+      active session), not proven transcript-upload endpoints.
+    default: false
+    entries:
+      - domain: prd-euw1-ucs.aibixby.com
+        tiers: [strict]
+        confidence: medium
+        observed_locally: true
+        sources: [local-capture]
+        expected_breakage: "cloud voice recognition stops (intended in strict mode)"
+      - domain: provisioning-use2.mgmt.aibixby.com
+        tiers: [strict]
+        confidence: medium
+        observed_locally: true
+        sources: [local-capture, marq24]
+        expected_breakage: "voice service provisioning stops (intended in strict mode)"
+
+  doh:
+    description: >
+      Known public DNS-over-HTTPS/DoT endpoint domains (from the HaGeZi DoH
+      list snapshot). At build time these are resolved to IPs and blocked in
+      nftables for the target TVs ONLY in strict mode, AFTER excluding any IP
+      that is also used by a keep-list/essential domain (keep wins). Expect
+      this list to shrink or empty out: DoH endpoints (dns.google,
+      one.one.one.one...) share infrastructure with content CDNs, and an IP
+      that also serves YouTube must never be dropped. If it empties, DoH is
+      reported as PARTIALLY CONTROLLED (DNS is still forced + logged).
+    default: false
+    entries:
+      - domain: dns.google
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: one.one.one.one
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: dns.cloudflare.com
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: dns.quad9.net
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: dns9.quad9.net
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: dns.adguard.com
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: adguard-dns.com
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: dns.nextdns.io
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+
+# Structural (non-domain) enforcement. Implemented by tvguard-apply.sh from
+# the privacy state file; no per-domain resolution needed.
+structural:
+  dns_53: "FORCE - TV -> any external :53 (udp/tcp) is DNAT'd to the local Pi-hole (existing TVGuard baseline, active in all modes; this is what makes hard-coded resolvers ineffective)"
+  dot_853: "DROP in standard+strict (tcp+udp, new connections, logged as TVGUARD-DOT)"
+  doh_ips: "DROP in strict only, resolved at build time, keep-list overlap excluded"
+  quic: "NEVER blocked - UDP/443 must remain usable for YouTube/streaming"
+  https_443: "NEVER blocked"

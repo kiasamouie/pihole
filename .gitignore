@@ -19,3 +19,13 @@ config/tvguard.conf
 data/*.tmp
 .DS_Store
 reports/raw/ra-capture-*.txt
+
+# Generated privacy-policy resolution data (ephemeral live IPs - re-resolve on demand)
+data/privacy-policy/
+
+# Offline-reconnect experiment output (runtime captures)
+data/offline-reconnect/
+
+# Python bytecode
+__pycache__/
+*.pyc

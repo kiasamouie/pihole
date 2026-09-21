@@ -1,0 +1,248 @@
+#
+# Known breakage evidence - domains/families where community or research
+# evidence says blocking them breaks a TV function.
+#
+# Every deny candidate in config/privacy-policy.yaml was cross-checked against
+# this file BEFORE inclusion. Entries here default to KEEP unless the privacy
+# benefit clearly outweighs the function (in which case the trade-off is
+# written in the policy file itself).
+#
+# Evidence key:
+#   perflyst-82      Perflyst/PiHoleBlocklist issue #82 (documented YouTube /
+#                    Prime Video / app-launch failures on Samsung after QBE blocks)
+#   perflyst-comment perflyst SmartTV.txt inline comments (stale since 2023-07 but
+#                    the breakage annotations remain the most valuable artifact
+#                    in this space - they are annotations, not blocklist rows)
+#   fightback        dgomesbr/fightback-consumer-tv research notes (2026-09-08
+#                    collection; vendor docs + academic sources, see
+#                    research/github/snapshots/fightback-research-notes.md)
+#   hagezi           HaGeZi list structure: native.samsung (199-200 entries)
+#                    lists parent domains, incl. families that contain essential
+#                    subdomains
+#   local-capture    observed on this Samsung (captures/ 2026-09-20, reports/06)
+#
+# default_action values:
+#   keep            do not block; essential function
+#   keep-unless     do not block unless the user explicitly accepts the breakage
+#   family-unsafe   the PARENT domain/family must never be blocked as a wildcard
+#                   even though some subdomains are individually deny candidates
+#
+keeps:
+
+  - domain: time.samsungcloudsolution.com
+    family: samsungcloudsolution.com
+    source: [perflyst-comment, fightback, local-capture]
+    symptom: "Plex, YouTube and Amazon Video stop working on some Samsung TVs"
+    evidence: "perflyst SmartTV.txt line: '#time.samsungcloudsolution.com # if blocked, services like Plex, YouTube and Amazon Video not working anymore on some Samsung TV's'; observed continuously on our TV in every session"
+    risk: high
+    default_action: keep
+
+  - domain: gpm.samsungqbe.com
+    family: samsungqbe.com
+    source: [perflyst-82, local-capture]
+    symptom: "connection problems after QBE block (issue #82)"
+    evidence: "perflyst SmartTV.txt line: '#gpm.samsungqbe.com # Numerous connection problems, e.g. #82'"
+    risk: high
+    default_action: keep
+
+  - domain: osb-ussvc.samsungqbe.com
+    family: samsungqbe.com
+    source: [perflyst-comment, local-capture]
+    symptom: "TV Plus fails"
+    evidence: "perflyst SmartTV.txt line: '#osb-ussvc.samsungqbe.com # required for TV Plus'; local flow observed in idle sessions"
+    risk: high
+    default_action: keep
+
+  - domain: osb-eusvc-v2.samsungqbe.com
+    family: samsungqbe.com
+    source: [perflyst-82, local-capture]
+    symptom: "app launch / app infra failures (issue #82: YouTube, Prime Video)"
+    evidence: "perflyst issue #82 history + local observed flow"
+    risk: high
+    default_action: keep
+
+  - domain: osb-apps-v2.samsungqbe.com
+    family: samsungqbe.com
+    source: [perflyst-82, local-capture]
+    symptom: "app launch / app infra failures (issue #82)"
+    evidence: "perflyst issue #82 history + local observed flow"
+    risk: high
+    default_action: keep
+
+  - domain: osb-auth-eusvc-v2.samsungqbe.com
+    family: samsungqbe.com
+    source: [perflyst-82, local-capture]
+    symptom: "app auth / app infra failures (issue #82)"
+    evidence: "perflyst issue #82 history + local observed flow"
+    risk: high
+    default_action: keep
+
+  - domain: osb-tnc-v2-appsacc.samsungqbe.com
+    family: samsungqbe.com
+    source: [perflyst-82, local-capture]
+    symptom: "app infra failures (issue #82)"
+    evidence: "perflyst issue #82 history + local observed flow"
+    risk: high
+    default_action: keep
+
+  - domain: auth.samsungosp.com
+    family: samsungosp.com
+    source: [perflyst-comment, fightback]
+    symptom: "Samsung account sign-in / TV account features break"
+    evidence: "fightback notes: samsungosp.com hosts Samsung account/auth; blocking it breaks sign-in"
+    risk: high
+    default_action: keep
+
+  - domain: gld.push.samsungosp.com
+    family: samsungosp.com
+    source: [local-capture, perflyst]
+    symptom: "push notifications to the TV stop"
+    evidence: "observed in local capture; OSP push infrastructure"
+    risk: medium
+    default_action: keep
+
+  - domain: lcprd1.samsungcloudsolution.net
+    family: samsungcloudsolution.net
+    source: [fightback, local-capture]
+    symptom: "Smart Hub breaks"
+    evidence: "fightback: blocks Smart Hub; local evidence: persistent 100k+ packet flow from this TV"
+    risk: high
+    default_action: keep
+
+  - domain: configprd.samsungcloudsolution.net
+    family: samsungcloudsolution.net
+    source: [fightback]
+    symptom: "device configuration distribution"
+    evidence: "fightback research notes list configprd as part of the do-not-block samsungcloudsolution.net family"
+    risk: medium
+    default_action: keep
+
+  - domain: otnprd8.samsungcloudsolution.net
+    family: samsungcloudsolution.net
+    source: [fightback]
+    symptom: "firmware/OTA updates stop"
+    evidence: "otnprd* are Samsung OTA update hosts"
+    risk: low
+    default_action: keep-unless
+    note: "firmware/security updates - keep unless the user explicitly opts out of OTA"
+
+  - domain: otnprd9.samsungcloudsolution.net
+    family: samsungcloudsolution.net
+    source: [fightback]
+    symptom: "firmware/OTA updates stop"
+    evidence: "otnprd* are Samsung OTA update hosts"
+    risk: low
+    default_action: keep-unless
+
+  - domain: otnprd10.samsungcloudsolution.net
+    family: samsungcloudsolution.net
+    source: [fightback]
+    symptom: "firmware/OTA updates stop"
+    evidence: "otnprd* are Samsung OTA update hosts"
+    risk: low
+    default_action: keep-unless
+
+  - domain: otnprd11.samsungcloudsolution.net
+    family: samsungcloudsolution.net
+    source: [fightback]
+    symptom: "firmware/OTA updates stop"
+    evidence: "otnprd* are Samsung OTA update hosts"
+    risk: low
+    default_action: keep-unless
+
+  - domain: www.samsungotn.net
+    family: samsungotn.net
+    source: [fightback]
+    symptom: "firmware/OTA updates stop"
+    evidence: "samsungotn.net is the OTA update domain"
+    risk: low
+    default_action: keep-unless
+
+  - domain: otn.samsungcloudcdn.com
+    family: samsungcloudcdn.com
+    source: [fightback]
+    symptom: "firmware/OTA update delivery stops"
+    evidence: "OTN CDN"
+    risk: low
+    default_action: keep-unless
+
+  - domain: multiscreen.samsung.com
+    family: samsung.com
+    source: [fightback, local-capture]
+    symptom: "casting / multi-screen features break"
+    evidence: "fightback: Samsung Multi Screen is the casting/remote infrastructure"
+    risk: medium
+    default_action: keep
+
+  - domain: infolink.pavv.co.kr
+    family: pavv.co.kr
+    source: [fightback]
+    symptom: "app store installs/updates break"
+    evidence: "fightback: pavv.co.kr is the Samsung app store backend"
+    risk: medium
+    default_action: keep
+
+  - domain: ns11.whois.co.kr
+    family: whois.co.kr
+    source: [perflyst-comment]
+    symptom: "Series 7 YouTube app fails"
+    evidence: "perflyst annotation: required by Series 7 YouTube app"
+    risk: medium
+    default_action: keep
+
+  # --- Family-level: the PARENT domain must never become a wildcard rule -------
+  # (individual, proven subdomains from these families ARE deny candidates in
+  #  config/privacy-policy.yaml; that is deliberate and documented there)
+
+  - domain: samsungcloudsolution.com
+    family: samsungcloudsolution.com
+    source: [hagezi, local-capture]
+    symptom: "n/a - family contains time/, cdn/, oemp..., notice* subdomains"
+    evidence: "hagezi lists the parent; our own captures show essential subdomains; a *.samsungcloudsolution.com rule would hit time.samsungcloudsolution.com and break Plex/YouTube/Prime"
+    risk: high
+    default_action: family-unsafe
+
+  - domain: samsungcloudsolution.net
+    family: samsungcloudsolution.net
+    source: [hagezi, local-capture, fightback]
+    symptom: "n/a - family contains lcprd1 (Smart Hub), configprd, otnprd*, devicelog"
+    evidence: "mix of essential and telemetry in one family => exact subdomains only"
+    risk: high
+    default_action: family-unsafe
+
+  - domain: samsungqbe.com
+    family: samsungqbe.com
+    source: [perflyst-82, hagezi]
+    symptom: "YouTube/Prime/app launch failures (documented)"
+    evidence: "perflyst issue #82; hagezi lists the parent"
+    risk: high
+    default_action: family-unsafe
+
+  - domain: samsungacr.com
+    family: samsungacr.com
+    source: [hagezi, perflyst, blocklistproject, marq24, fightback]
+    symptom: "n/a - ACR-only domain; blocking the whole family is safe, but we
+      still use exact subdomains because the parent itself is not what the TV
+      talks to"
+    evidence: "5 independent lists agree on samsungacr.com; our TV observed
+      log-ingestion-eu + log-config subdomains"
+    risk: low
+    default_action: family-unsafe
+    note: "safe at family level per all sources; kept exact for precision and
+      consistency with the no-wildcard rule"
+
+  - domain: samsungcom
+    family: samsung.com
+    source: [hagezi, local-capture]
+    symptom: "n/a - family contains multiscreen (casting), account, app-store hosts"
+    evidence: "mixed essential + analytics subdomains => exact only"
+    risk: high
+    default_action: family-unsafe
+
+  - domain: samsungcloud.tv
+    family: samsungcloud.tv
+    source: [hagezi, local-capture]
+    symptom: "n/a - family contains EPG (tvpnlinupepgpeu), fc (heaviest flow), qoe, acr-*-prd"
+    evidence: "mix of essential content/EPG and ACR/telemetry => exact only"
+    risk: high
+    default_action: family-unsafe

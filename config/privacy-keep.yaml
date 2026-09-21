@@ -1,0 +1,168 @@
+#
+# TVGuard privacy KEEP list - domains (and their resolved IPs) that MUST
+# override any deny candidate. The build step resolves these through an
+# external resolver too; any deny candidate whose IP collides with a keep
+# domain's IP is excluded from the firewall set and reported in the preview.
+#
+# Nothing here is a judgement that the domain is "safe" - it is the
+# documented cost/benefit decision: the privacy loss is accepted because
+# blocking the alternative would break a TV function we need.
+#
+# Source key:
+#   local-capture            observed on this Samsung (reports/06 + captures/)
+#   perflyst / fightback     maintained community lists w/ breakage annotations
+#   hagezi                   HaGeZi native Samsung list (membership only)
+#   samsung-observed-flow    long-lived flow seen in conntrack/flow data
+#
+keeps:
+
+  # --- YouTube / Google content (never touch CDN/API paths) -----------------
+  - domain: www.youtube.com
+    reason: "YouTube app/API"
+    sources: [local-capture]
+  - domain: i.ytimg.com
+    reason: "YouTube image CDN"
+    sources: [local-capture]
+  - domain: yt3.ggpht.com
+    reason: "YouTube thumbnails"
+    sources: [local-capture]
+  - domain: yt3.googleusercontent.com
+    reason: "YouTube images"
+    sources: [local-capture]
+  - domain: lh3.googleusercontent.com
+    reason: "Google images (app icons)"
+    sources: [local-capture]
+  - domain: www.gstatic.com
+    reason: "Google static content"
+    sources: [local-capture]
+  - domain: rr1---sn-8pgbpohxqp5-aige7.googlevideo.com
+    reason: "YouTube video CDN (observed host)"
+    sources: [local-capture]
+  - domain: rr2---sn-8pgbpohxqp5-aige7.googlevideo.com
+    reason: "YouTube video CDN (observed host)"
+    sources: [local-capture]
+  - domain: rr2---sn-8pgbpohxqp5-aigk.googlevideo.com
+    reason: "YouTube video CDN (observed host)"
+    sources: [local-capture]
+  - domain: rr6---sn-8pgbpohxqp5-aigk.googlevideo.com
+    reason: "YouTube video CDN (observed host)"
+    sources: [local-capture]
+  - domain: rr7---sn-8pgbpohxqp5-aigk.googlevideo.com
+    reason: "YouTube video CDN (observed host)"
+    sources: [local-capture]
+  - domain: tools.google.com
+    reason: "Google bootstrap (observed)"
+    sources: [local-capture]
+  - domain: clients1.google.com
+    reason: "Google service bootstrap (observed)"
+    sources: [local-capture]
+  - domain: mediaservices.cdn-apple.com
+    reason: "Apple services CDN (observed)"
+    sources: [local-capture]
+
+  # --- Samsung core platform (documented breakage if blocked) ----------------
+  - domain: time.samsungcloudsolution.com
+    reason: "time sync used by TV platform - Perflyst/fightback: blocking breaks Plex/YouTube/Prime Video"
+    sources: [local-capture, perflyst, fightback]
+  - domain: lcprd1.samsungcloudsolution.net
+    reason: "fightback: breaks Smart Hub; local evidence: persistent 100k+ packet flow from this TV"
+    sources: [local-capture, fightback, samsung-observed-flow]
+  - domain: cdn.samsungcloudsolution.com
+    reason: "content delivery/update CDN (observed)"
+    sources: [local-capture]
+  - domain: configprd.samsungcloudsolution.net
+    reason: "config endpoint - part of the do-not-block samsungcloudsolution.net family"
+    sources: [fightback]
+  - domain: otnprd8.samsungcloudsolution.net
+    reason: "OTA update infrastructure"
+    sources: [fightback]
+  - domain: otnprd9.samsungcloudsolution.net
+    reason: "OTA update infrastructure"
+    sources: [fightback]
+  - domain: otnprd10.samsungcloudsolution.net
+    reason: "OTA update infrastructure"
+    sources: [fightback]
+  - domain: otnprd11.samsungcloudsolution.net
+    reason: "OTA update infrastructure"
+    sources: [fightback]
+  - domain: www.samsungotn.net
+    reason: "OTA update infrastructure"
+    sources: [fightback]
+  - domain: otn.samsungcloudcdn.com
+    reason: "OTA update CDN"
+    sources: [fightback]
+  - domain: auth.samsungosp.com
+    reason: "Samsung account auth - blocking it breaks sign-in/TV accounts"
+    sources: [perflyst]
+  - domain: gld.push.samsungosp.com
+    reason: "Samsung push notifications (observed)"
+    sources: [local-capture, perflyst]
+  - domain: play.samsungcloud.com
+    reason: "Samsung app platform (observed)"
+    sources: [local-capture]
+  - domain: api.samsungcloud.com
+    reason: "Samsung cloud API (observed)"
+    sources: [local-capture]
+  - domain: tvpnlinupepgpeu.samsungcloud.tv
+    reason: "Samsung TV Plus EPG (EU) - heaviest domain in the unattended window; TV Plus content source"
+    sources: [local-capture, samsung-observed-flow]
+  - domain: fc.samsungcloud.tv
+    reason: "UNKNOWN purpose but heaviest Samsung domain observed - keep until characterised (never block an uncharacterised workhorse)"
+    sources: [local-capture, samsung-observed-flow]
+  - domain: gpm.samsungqbe.com
+    reason: "Perflyst #82: blocking QBE hosts broke YouTube/Prime apps; issue still open"
+    sources: [local-capture, perflyst]
+  - domain: osb-v2.samsungqbe.com
+    reason: "Perflyst #82: QBE app infra - breaks apps if blocked"
+    sources: [local-capture, perflyst]
+  - domain: osb-apps-v2.samsungqbe.com
+    reason: "Perflyst #82: QBE app infra"
+    sources: [local-capture, perflyst]
+  - domain: osb-eusvc-v2.samsungqbe.com
+    reason: "Perflyst #82: QBE app infra"
+    sources: [local-capture, perflyst]
+  - domain: osb-ussvc-v2.samsungqbe.com
+    reason: "Perflyst #82 + fightback: osb-ussvc breaks TV Plus"
+    sources: [local-capture, perflyst, fightback]
+  - domain: osb-auth-eusvc-v2.samsungqbe.com
+    reason: "Perflyst #82: QBE app infra"
+    sources: [local-capture, perflyst]
+  - domain: osb-tnc-v2-appsacc.samsungqbe.com
+    reason: "Perflyst #82: QBE app infra"
+    sources: [local-capture, perflyst]
+  - domain: multiscreen.samsung.com
+    reason: "Samsung Multi Screen (cast/remote) - blocking breaks casting features"
+    sources: [fightback]
+  - domain: infolink.pavv.co.kr
+    reason: "Samsung app store backend - blocking breaks app installs/updates"
+    sources: [fightback]
+  - domain: ns11.whois.co.kr
+    reason: "Perflyst: required by Series 7 YouTube app"
+    sources: [perflyst]
+
+  # --- Samsung CDN / content --------------------------------------------------
+  - domain: d1itljbfuaik2i.cloudfront.net
+    reason: "CloudFront CDN used by Samsung content (observed)"
+    sources: [local-capture]
+  - domain: img-resize-cdn-prod.samsungnyc.com
+    reason: "Samsung NYC image CDN (observed)"
+    sources: [local-capture]
+
+  # --- Amazon / Infinitive (Prime Video) ---------------------------------------
+  - domain: unagi-eu.amazon.com
+    reason: "Amazon EU API (Prime Video, observed)"
+    sources: [local-capture]
+  - domain: api.amazon.co.uk
+    reason: "Amazon UK API (observed)"
+    sources: [local-capture]
+  - domain: api.amazonvideo.com
+    reason: "Prime Video API (observed)"
+    sources: [local-capture]
+  - domain: global.telemetry.insights.video.a2z.com
+    reason: "shared Amazon/Infinitive video infrastructure - unverified purpose, shared infra => keep until characterised"
+    sources: [local-capture]
+
+  # --- Neutral / uncharacterised (do not block on a name alone) ----------------
+  - domain: mobile-data.onetrust.io
+    reason: "cookie-consent platform used by web apps; uncharacterised on this TV => keep"
+    sources: [local-capture]

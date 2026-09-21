@@ -1,0 +1,262 @@
+domain,present-in-hagezi,seen-on-my-tv,also-in-other-list,known-purpose,risk,confidence,candidate-policy
+108.128.173.155,no,yes,-,-,medium,medium,unknown-review
+194.168.4.100,no,yes,-,-,medium,medium,unknown-review
+213.104.27.12,no,yes,-,-,medium,medium,unknown-review
+213.104.27.13,no,yes,-,-,medium,medium,unknown-review
+34.240.60.17,no,yes,-,-,medium,medium,unknown-review
+34.241.13.242,no,yes,-,-,medium,medium,unknown-review
+34.255.156.109,no,yes,-,-,medium,medium,unknown-review
+52.31.176.228,no,yes,-,-,medium,medium,unknown-review
+54.78.39.206,no,yes,-,-,medium,medium,unknown-review
+63.33.78.19,no,yes,-,-,medium,medium,unknown-review
+63.34.205.144,no,yes,-,-,medium,medium,unknown-review
+acr-au-prd.samsungcloud.tv,yes,no,-,Samsung ACR (Automatic Content Recognition) endpoint,low,medium,deny-standard
+acr-br-prd.samsungcloud.tv,yes,no,-,Samsung ACR (Automatic Content Recognition) endpoint,low,medium,deny-standard
+acr-ca-prd.samsungcloud.tv,yes,no,-,Samsung ACR (Automatic Content Recognition) endpoint,low,medium,deny-standard
+acr-eu-prd.samsungcloud.tv,yes,no,-,Samsung ACR (Automatic Content Recognition) endpoint,low,medium,deny-standard
+acr-in-prd.samsungcloud.tv,yes,no,-,Samsung ACR (Automatic Content Recognition) endpoint,low,medium,deny-standard
+acr-kr-prd.samsungcloud.tv,yes,no,-,Samsung ACR (Automatic Content Recognition) endpoint,low,medium,deny-standard
+acr-mx-prd.samsungcloud.tv,yes,no,-,Samsung ACR (Automatic Content Recognition) endpoint,low,medium,deny-standard
+acr-nz-prd.samsungcloud.tv,yes,no,-,Samsung ACR (Automatic Content Recognition) endpoint,low,medium,deny-standard
+acr-us-prd.samsungcloud.tv,yes,no,-,Samsung ACR (Automatic Content Recognition) endpoint,low,medium,deny-standard
+acr0.samsungcloudsolution.com,yes,no,"blocklistproject,marq24,fightback",Samsung ACR (Automatic Content Recognition) endpoint,high,high,deny-standard
+akcjasamsung.e-kei.pl,yes,no,-,-,medium,medium,unknown-review
+analytics-api.samsunghealthcn.com,yes,no,-,-,medium,medium,unknown-review
+analytics-dev-api.test.samsunghealth.com,yes,no,-,-,medium,medium,unknown-review
+analytics-stg.samsungknox.com,yes,no,-,-,medium,medium,unknown-review
+analytics.bigdata.samsung.com,yes,no,fightback,Samsung service (mixed - check subdomain),medium,high,unknown-review
+analytics.mpay.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+analytics.samsungedo.com,yes,no,-,-,medium,medium,unknown-review
+analytics.samsungknox.com,yes,no,-,-,medium,medium,unknown-review
+api-analytics-qa.samsungknox.com,yes,no,-,-,medium,medium,unknown-review
+api-analytics.samsungknox.com,yes,no,-,-,medium,medium,unknown-review
+api-samsung.swypeconnect.com,yes,no,-,-,medium,medium,unknown-review
+api.amazon.co.uk,no,yes,-,-,low,medium,keep
+api.amazonvideo.com,no,yes,-,-,low,medium,keep
+api.runestone.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+api.samsungcloud.com,no,yes,marq24,Samsung cloud service (content/telemetry mix - check subdomain),low,high,keep
+apu.samsungelectronics.com,yes,no,perflyst,-,high,high,unknown-review
+b2banalytics.samsungknox.com,yes,no,-,-,medium,medium,unknown-review
+bigdata.ssp.samsung.com,yes,no,fightback,Samsung service (mixed - check subdomain),medium,high,unknown-review
+bldr.mkt.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+bpu.samsungelectronics.com,yes,no,perflyst,-,high,high,unknown-review
+business.samsungusa.com,yes,no,-,-,medium,medium,unknown-review
+catalyst.adgrx.com,no,yes,-,Programmatic ad exchange (AdGRX),low,medium,deny-standard
+cdn.samsungcloudsolution.com,no,yes,"blocklistproject,marq24",Samsung cloud service (content/telemetry mix - check subdomain),high,high,keep
+channelusa.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+clientapi-samsung.dtignite.com,yes,no,-,-,medium,medium,unknown-review
+clients1.google.com,no,yes,-,-,low,medium,keep
+cn-api.mcsvc.samsung.com.cn,yes,no,-,-,medium,medium,unknown-review
+cpu.samsungelectronics.com,yes,no,perflyst,-,high,high,unknown-review
+d1itljbfuaik2i.cloudfront.net,no,yes,marq24,-,low,high,keep
+dc.di.atlas.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+dc.di.runestone.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+dc.dqa.samsung.com,yes,no,fightback,Samsung service (mixed - check subdomain),medium,high,unknown-review
+ddf.di.atlas.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+dev-apigw.samsungdmroute.com,yes,no,-,-,medium,medium,unknown-review
+devicelog.samsungcloudsolution.net,yes,no,fightback,Samsung cloud service (content/telemetry mix - check subdomain),high,high,deny-standard
+diagmon-policy.samsungdm.com,yes,no,-,-,medium,medium,unknown-review
+diagmon-serviceapi.samsungdm.com,yes,no,-,-,medium,medium,unknown-review
+dls-account.di.atlas.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+dls-ddc.dqa.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+dls-udc.dqa.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+dls.di.runestone.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+download-samsung.dtignite.com,yes,no,-,-,medium,medium,unknown-review
+dpu.samsungelectronics.com,yes,no,perflyst,-,high,high,unknown-review
+dqa-auth.di.atlas.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+ehg-samsungusa.hitbox.com,yes,no,-,-,medium,medium,unknown-review
+eligibility-panelresearch.googlevideo.com,no,yes,-,-,low,medium,deny-standard
+event-tracking.samsung.com,yes,no,fightback,Samsung service (mixed - check subdomain),low,high,deny-strict
+fast.samsungsingapore.demdex.net,yes,no,-,-,medium,medium,unknown-review
+fc.samsungcloud.tv,no,yes,-,Samsung cloud service (content/telemetry mix - check subdomain),low,medium,keep
+gld.push.samsungosp.com,no,yes,"blocklistproject,marq24",Samsung account/auth + push (OSP),high,high,keep
+global.telemetry.insights.video.a2z.com,no,yes,-,-,low,medium,keep
+googleads.g.doubleclick.net,no,yes,"perflyst,fightback",Google ad infrastructure,low,high,deny-standard
+gpm.samsungqbe.com,no,yes,"blocklistproject,marq24","QBE app platform (Smart Hub apps, TV Plus)",high,high,keep
+h4g3z1-native.samsung.web.app,yes,no,-,-,medium,medium,unknown-review
+i.ytimg.com,no,yes,-,-,low,medium,keep
+images.frbusiness.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+images.it.business.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+images.partnersupport.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+images.ssbusiness.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+img-resize-cdn-prod.samsungnyc.com,no,yes,"blocklistproject,marq24",Samsung CDN/content delivery,low,high,keep
+invitation.samsungiotcloud.com,yes,no,-,-,medium,medium,unknown-review
+kpu.samsungelectronics.com,yes,no,perflyst,-,high,high,unknown-review
+lbs-samsung.swypeconnect.com,yes,no,-,-,medium,medium,unknown-review
+lcprd1.samsungcloudsolution.net,no,yes,"blocklistproject,marq24",Samsung cloud service (content/telemetry mix - check subdomain),high,high,keep-never-block
+lh3.googleusercontent.com,no,yes,-,-,low,medium,keep
+log-config.samsungacr.com,no,yes,blocklistproject,Samsung ACR log ingestion/config,low,high,deny-standard
+log-ingestion-eu.samsungacr.com,no,yes,perflyst,Samsung ACR log ingestion/config,low,high,deny-standard
+lp.americas.business.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+lp.apac.business.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+lp.mkt-email.samsungsds.com,yes,no,-,-,medium,medium,unknown-review
+lp.smartbusiness.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+matomo.samsungsdibs.at,yes,no,-,-,medium,medium,unknown-review
+mediaservices.cdn-apple.com,no,yes,-,-,low,medium,keep
+metric.account-samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+moai-dev-samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+mobile-data.onetrust.io,no,yes,-,Consent/cookie management,low,medium,keep
+nmetrics.samsung.com,yes,no,fightback,Samsung service (mixed - check subdomain),low,high,deny-strict
+nmetrics.samsungmobile.com,yes,no,-,-,medium,medium,unknown-review
+nrdp.logs.netflix.com,no,yes,-,-,low,medium,deny-standard
+orsdls.di.runestone.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+orsfs.di.runestone.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+osb-apps-v2.samsungqbe.com,no,yes,"perflyst,blocklistproject,marq24","QBE app platform (Smart Hub apps, TV Plus)",high,high,keep
+osb-auth-eusvc-v2.samsungqbe.com,no,yes,marq24,"QBE app platform (Smart Hub apps, TV Plus)",high,high,keep
+osb-eusvc-v2.samsungqbe.com,no,yes,-,"QBE app platform (Smart Hub apps, TV Plus)",high,medium,keep
+osb-krsvc.samsungqbe.com,yes,no,perflyst,"QBE app platform (Smart Hub apps, TV Plus)",high,high,unknown-review
+osb-tnc-v2-appsacc.samsungqbe.com,no,yes,-,"QBE app platform (Smart Hub apps, TV Plus)",high,medium,keep
+osb-ussvc-v2.samsungqbe.com,no,yes,-,"QBE app platform (Smart Hub apps, TV Plus)",high,medium,keep
+osb-v2.samsungqbe.com,no,yes,"blocklistproject,marq24","QBE app platform (Smart Hub apps, TV Plus)",high,high,keep
+osb.samsungqbe.com,yes,no,"perflyst,blocklistproject,marq24","QBE app platform (Smart Hub apps, TV Plus)",high,high,unknown-review
+play.samsungcloud.com,no,yes,-,Samsung cloud service (content/telemetry mix - check subdomain),low,medium,keep
+plbusiness.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+prd-euw1-ucs.aibixby.com,no,yes,-,Bixby voice cloud,low,medium,deny-strict
+prderrordumphsm.samsungcloudsolution.com,yes,no,perflyst,Samsung cloud service (content/telemetry mix - check subdomain),high,high,deny-standard
+prderrordumpssm.samsungcloudsolution.net,yes,no,-,Samsung cloud service (content/telemetry mix - check subdomain),high,medium,unknown-review
+provisioning-use2.mgmt.aibixby.com,no,yes,marq24,Bixby voice cloud,low,high,deny-strict
+qmds-dev-samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+qoe.samsungcloud.tv,no,yes,-,Samsung cloud service (content/telemetry mix - check subdomain),low,medium,deny-standard
+regi.di.atlas.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+report.gras.samsungdm.com,yes,no,-,-,medium,medium,unknown-review
+rr1---sn-8pgbpohxqp5-aige7.googlevideo.com,no,yes,-,-,low,medium,keep
+rr2---sn-8pgbpohxqp5-aige7.googlevideo.com,no,yes,-,-,low,medium,keep
+rr2---sn-8pgbpohxqp5-aigk.googlevideo.com,no,yes,-,-,low,medium,keep
+rr6---sn-8pgbpohxqp5-aigk.googlevideo.com,no,yes,-,-,low,medium,keep
+rr7---sn-8pgbpohxqp5-aigk.googlevideo.com,no,yes,-,-,low,medium,keep
+rtb-config.samsungads.com,no,yes,-,Samsung/ad-network advertising,low,medium,deny-standard
+rtb.adgrx.com,no,yes,-,Programmatic ad exchange (AdGRX),low,medium,deny-standard
+samsung-akcja.e-kei.pl,yes,no,-,-,medium,medium,unknown-review
+samsung-benelux.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsung-com.112.2o7.net,yes,no,-,-,medium,medium,unknown-review
+samsung-france.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsung-germany.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsung-italy.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsung-mena.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsung-nordics.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsung-poland.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsung.appnext.com,yes,no,-,-,medium,medium,unknown-review
+samsung.attn.tv,yes,no,-,-,medium,medium,unknown-review
+samsung.bimtrackapp.co,yes,no,-,-,medium,medium,unknown-review
+samsung.com.ssl.sc.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsung.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsung.ecorebates.com,yes,no,-,-,medium,medium,unknown-review
+samsung.telemetry.eyeo.com,yes,no,-,-,medium,medium,unknown-review
+samsungacr.com,yes,no,"perflyst,blocklistproject,marq24,fightback",Samsung ACR log ingestion/config,medium,high,unknown-review
+samsungadhub.com,yes,no,"perflyst,marq24,fightback",Samsung/ad-network advertising,medium,high,unknown-review
+samsungads.adsmeasurement.com,yes,no,fightback,-,medium,high,unknown-review
+samsungads.com,yes,no,"perflyst,blocklistproject,fightback",Samsung/ad-network advertising,medium,high,unknown-review
+samsungafrica.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungafrica.tt.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungallstore.com,yes,no,-,-,medium,medium,unknown-review
+samsungau.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungau.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungbenelux.tt.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungbrazil.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungca.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungcanada.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungcanada.tt.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungcard.data.adobedc.net,yes,no,-,-,medium,medium,unknown-review
+samsungcard.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungcard.sc.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungchina.tt.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungcis.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungcis.tt.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungelectronicsamericainc.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungeu.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungeucdm.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungeucdm.tt.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungeverland.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsunghk.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsunghq.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungid.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungindiaelectronics.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungindonesia.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungiraq.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungjapan.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungjordan.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungkorea.tt.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungkr.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungksa.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsunglatam.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsunglatam.tt.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsunglevant.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsunglife.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungmalaysia.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungmena.tt.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungnorthamerica.sc.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungott.sora.yoyi.com.cn,yes,no,-,-,medium,medium,unknown-review
+samsungpakistan.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungph.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungr.com,yes,no,-,-,medium,medium,unknown-review
+samsungrm.com,yes,no,-,-,medium,medium,unknown-review
+samsungrum.beusable.net,yes,no,-,-,medium,medium,unknown-review
+samsungsamcol.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungsamcolepp.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungsavinaepp.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungscript.beusable.net,yes,no,-,-,medium,medium,unknown-review
+samsungseao.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungseao.tt.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungsebnbg.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungsebnnl.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungsec.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungseda.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungsem.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungsemepp.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungsepr.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungseromro.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungsesarepp.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungsetkepp.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungsingapore.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungspain.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungth.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungthailand.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungtseepp.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungturkey.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungturkey.demdex.net,yes,no,-,-,medium,medium,unknown-review
+samsungturkey.tt.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungtv-d.openx.net,yes,no,fightback,Samsung/ad-network advertising,low,high,deny-standard
+samsungtvads.com,yes,no,fightback,Samsung/ad-network advertising,medium,high,unknown-review
+samsunguk.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungus.tt.omtrdc.net,yes,no,-,-,medium,medium,unknown-review
+samsungusa.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+samsungvn.api.useinsider.com,yes,no,-,-,medium,medium,unknown-review
+sca.samsung.com,yes,no,"perflyst,marq24",Samsung service (mixed - check subdomain),medium,high,unknown-review
+seao.business.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+shealth-analytics-api.samsunghealth.com,yes,no,-,-,medium,medium,unknown-review
+shealth-analytics-stg-api.samsunghealth.com,yes,no,-,-,medium,medium,unknown-review
+sia.internet.apps.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+smetrics.samsung.com,yes,no,fightback,Samsung service (mixed - check subdomain),low,high,deny-strict
+smetrics.samsung.com.cn,yes,no,-,-,medium,medium,unknown-review
+sspapi-prd.samsungrs.com,yes,no,-,-,medium,medium,unknown-review
+static.doubleclick.net,no,yes,blocklistproject,Google ad infrastructure,low,high,deny-standard
+stats.samsungpass.com,yes,no,-,-,medium,medium,unknown-review
+stg-apigw.samsungdmroute.com,yes,no,-,-,medium,medium,unknown-review
+target-us.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+test.samsungrm.net,yes,no,"perflyst,marq24",-,medium,high,unknown-review
+time.samsungcloudsolution.com,no,yes,"blocklistproject,marq24",Samsung cloud service (content/telemetry mix - check subdomain),high,high,keep-never-block
+tools.google.com,no,yes,-,-,low,medium,keep
+tracking.americas.business.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+tracking.apac.business.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+tracking.europe.business.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+tracking.mkt-email.samsungsds.com,yes,no,-,-,medium,medium,unknown-review
+tracking.smartbusiness.samsung.com,yes,no,-,Samsung service (mixed - check subdomain),medium,medium,unknown-review
+tvp-ads-log.samsungads.com,no,yes,-,Samsung/ad-network advertising,low,medium,deny-standard
+tvpnlinupepgpeu.samsungcloud.tv,no,yes,-,Samsung cloud service (content/telemetry mix - check subdomain),low,medium,keep
+tvx.adgrx.com,no,yes,"perflyst,blocklistproject,fightback",Programmatic ad exchange (AdGRX),low,high,deny-standard
+unagi-eu.amazon.com,no,yes,-,-,low,medium,keep
+upu.samsungelectronics.com,yes,no,"perflyst,marq24",-,high,high,unknown-review
+ureca.samsungapps.com,yes,no,-,-,medium,medium,unknown-review
+us-report.gras.samsungdm.com,yes,no,-,-,medium,medium,unknown-review
+www.gstatic.com,no,yes,-,-,low,medium,keep
+www.youtube.com,no,yes,-,-,low,medium,keep
+xpu.samsungelectronics.com,yes,no,"perflyst,marq24",-,high,high,unknown-review
+ypu.samsungelectronics.com,yes,no,perflyst,-,high,high,unknown-review
+yt3.ggpht.com,no,yes,-,-,low,medium,keep
+yt3.googleusercontent.com,no,yes,-,-,low,medium,keep
+zn8qwjgdslpyjq5n3-samsungcustomerboard.siteintercept.qualtrics.com,yes,no,-,-,medium,medium,unknown-review
+zn9xowqszdbqtbfwx-seasamsung.siteintercept.qualtrics.com,yes,no,-,-,medium,medium,unknown-review
+znewylzpqds1jt1sh-samsunggdc.siteintercept.qualtrics.com,yes,no,-,-,medium,medium,unknown-review
+znexudtrhw0nwrmga-seasamsung.siteintercept.qualtrics.com,yes,no,-,-,medium,medium,unknown-review
+zneysvtqyfhzf6n4p-samsungeurope.siteintercept.qualtrics.com,yes,no,-,-,medium,medium,unknown-review
+zpu.samsungelectronics.com,yes,no,perflyst,-,high,high,unknown-review

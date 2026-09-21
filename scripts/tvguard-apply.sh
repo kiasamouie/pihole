@@ -52,6 +52,32 @@ fi
 STATE_DIR="${STATE_DIR:-/var/lib/tvguard}"
 STATE_FILE="$STATE_DIR/state"
 NFT_FILE="$STATE_DIR/tvguard.nft"
+# Table name is overridable for dry-run/CI rendering (TGUARD_TABLE=tvguard-dry);
+# production always uses the default name.
+TGUARD_TABLE="${TGUARD_TABLE:-tvguard}"
+
+# --- Privacy policy state (separate dimension from monitor/enforce) ----------
+# Set by scripts/privacy-policy-apply.sh (standard|strict) and privacy-policy-
+# disable.sh (off). When active, the resolved IP list produced by privacy-
+# policy-build.py (data/privacy-policy/resolved.json) is rendered as an extra
+# DROP set in the forward chain. It never changes NAT, the DNS-bypass DNAT,
+# or the TVGuard monitor/enforce mode. When off, the rendered table is
+# byte-identical to the pre-privacy ruleset.
+PRIVACY_STATE_FILE="$STATE_DIR/privacy-state"
+PRIVACY_RESOLVED="$ROOT/data/privacy-policy/resolved.json"
+PRIVACY_MODE="off"
+if [ -f "$PRIVACY_STATE_FILE" ]; then
+  PRIVACY_MODE="$(sed -n 's/^PRIVACY=//p' "$PRIVACY_STATE_FILE" | tail -1)"
+fi
+case "$PRIVACY_MODE" in standard|strict) : ;; *) PRIVACY_MODE="off" ;; esac
+PRIVACY_IPS=""
+PRIVACY_DOH_IPS=""
+if [ "$PRIVACY_MODE" != "off" ] && [ -f "$PRIVACY_RESOLVED" ] && command -v python3 >/dev/null 2>&1; then
+  PRIVACY_IPS="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(" ".join(sorted(d.get(sys.argv[2],{}).get("ips",[]))))' "$PRIVACY_RESOLVED" "$PRIVACY_MODE" 2>/dev/null)"
+  PRIVACY_DOH_IPS="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(" ".join(sorted(d.get("doh",{}).get("ips",[]))))' "$PRIVACY_RESOLVED" 2>/dev/null)"
+fi
+PRIVACY_IPS_CSV="${PRIVACY_IPS// /, }"
+PRIVACY_DOH_IPS_CSV="${PRIVACY_DOH_IPS// /, }"
 
 # Resolve the Pi-hole container IP for the DNS-bypass DNAT (see prerouting
 # comment). Empty => render falls back to `redirect`.
@@ -101,7 +127,7 @@ BLOCKED_IPS="$(parse_blocked_ips)"
 
 # --- Render the ruleset -------------------------------------------------------
 {
-  echo "table ip tvguard {"
+  echo "table ip $TGUARD_TABLE {"
   echo "    set tvs {"
   echo "        type ipv4_addr ;"
   echo "        elements = { $TV_LIST } ;"
@@ -113,10 +139,39 @@ BLOCKED_IPS="$(parse_blocked_ips)"
   fi
   echo "    }"
 
+  # Privacy policy sets (present only when a privacy tier is active).
+  if [ -n "$PRIVACY_IPS" ]; then
+    echo "    set tv_privacy_blocked {"
+    echo "        type ipv4_addr ;"
+    echo "        flags interval ;"
+    echo "        elements = { $PRIVACY_IPS_CSV } ;"
+    echo "    }"
+  fi
+  if [ "$PRIVACY_MODE" = "strict" ] && [ -n "$PRIVACY_DOH_IPS" ]; then
+    echo "    set tv_doh_blocked {"
+    echo "        type ipv4_addr ;"
+    echo "        flags interval ;"
+    echo "        elements = { $PRIVACY_DOH_IPS_CSV } ;"
+    echo "    }"
+  fi
+
   echo "    chain forward {"
   echo "        type filter hook forward priority -150 ;"
   # TV -> LAN (incl. the hub .1). Accept. NOTE: flat L2 PoC - this is NOT LAN isolation.
   echo "        ip saddr @tvs ip daddr $LAN_SUBNET counter accept"
+  # Privacy policy drops (new connections from a target TV to resolved
+  # deny-list IPs / known DoH endpoint IPs). ct state new means established
+  # flows keep working until they end; blocked attempts are logged.
+  if [ -n "$PRIVACY_IPS" ]; then
+    echo "        ip saddr @tvs ip daddr @tv_privacy_blocked ct state new counter log prefix \"TVGUARD-PRIVACY \" drop"
+  fi
+  if [ "$PRIVACY_MODE" = "strict" ] && [ -n "$PRIVACY_DOH_IPS" ]; then
+    echo "        ip saddr @tvs ip daddr @tv_doh_blocked ct state new counter log prefix \"TVGUARD-DOH \" drop"
+  fi
+  if [ "$PRIVACY_MODE" != "off" ]; then
+    echo "        ip saddr @tvs tcp dport 853 ct state new counter log prefix \"TVGUARD-DOT \" drop"
+    echo "        ip saddr @tvs udp dport 853 ct state new counter log prefix \"TVGUARD-DOT \" drop"
+  fi
   if [ "$MODE" = "enforce" ]; then
     echo "        ip saddr @tvs tcp dport 853 counter log prefix \"TVGUARD-DOT \" drop"
     if [ -n "$BLOCKED_IPS" ]; then
@@ -167,7 +222,10 @@ BLOCKED_IPS="$(parse_blocked_ips)"
   echo "}"
 } > "$NFT_FILE"
 
+PRIVACY_IP_COUNT=$(printf '%s' "$PRIVACY_IPS" | awk '{print NF}')
+PRIVACY_DOH_COUNT=$(printf '%s' "$PRIVACY_DOH_IPS" | awk '{print NF}')
 echo "Mode:        $MODE"
+echo "Privacy:     $PRIVACY_MODE (deny-IPs: $PRIVACY_IP_COUNT, doh-IPs: $PRIVACY_DOH_COUNT)"
 echo "Egress IF:   $EGRESS_IF"
 echo "TVs:         $TV_LIST"
 echo "Blocked:     ${BLOCKED_IPS:-<none>}"
@@ -182,8 +240,8 @@ if ! nft -c -f "$NFT_FILE" 2> "$STATE_DIR/nft-check.err"; then
 fi
 
 # --- Replace ONLY our table ---------------------------------------------------
-if nft list table ip tvguard >/dev/null 2>&1; then
-  nft delete table ip tvguard
+if nft list table ip "$TGUARD_TABLE" >/dev/null 2>&1; then
+  nft delete table ip "$TGUARD_TABLE"
 fi
 nft -f "$NFT_FILE"
 
@@ -243,4 +301,11 @@ EOF
   echo "UFW_ROUTE_RULES=managed per TV via 'ufw route allow from <tv> to any'"
 } > "$STATE_FILE"
 
-echo "OK: TVGuard loaded in $MODE mode (table ip tvguard)."
+# Refresh the privacy-state file only if it exists (we never enable privacy
+# from this script - that is privacy-policy-apply.sh's job). This keeps the
+# state consistent if the file was hand-edited.
+if [ -f "$PRIVACY_STATE_FILE" ]; then
+  echo "  privacy state: $PRIVACY_MODE" >&2
+fi
+
+echo "OK: TVGuard loaded in $MODE mode (table ip $TGUARD_TABLE)."
