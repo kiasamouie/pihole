@@ -3,7 +3,15 @@
 # privacy-policy-apply.sh - enable a privacy tier for the target TVs.
 #
 #   sudo scripts/privacy-policy-apply.sh standard
+#   sudo scripts/privacy-policy-apply.sh standard-no-voice
 #   sudo scripts/privacy-policy-apply.sh strict
+#
+# Testability overrides (documented, default to production values):
+#   PRIVACY_GROUP   Pi-hole group name (default: TVGuard-Privacy)
+#   PRIVACY_TARGETS space-separated client IPs to scope the policy to
+#                   (default: the `applies_to` list in config/privacy-policy.yaml)
+# These exist so apply/disable can be exercised against a throwaway group and a
+# mock client IP without touching the real Samsung client.
 #
 # What it does (all reversible via privacy-policy-disable.sh):
 #   1. Re-resolves config/privacy-policy.yaml -> data/privacy-policy/resolved.json
@@ -28,9 +36,12 @@ STATE_FILE="$STATE_DIR/privacy-state"
 
 TIER="${1:-}"
 case "$TIER" in
-  standard|strict) ;;
-  *) echo "usage: privacy-policy-apply.sh <standard|strict>" >&2; exit 4 ;;
+  standard|standard-no-voice|strict) ;;
+  *) echo "usage: privacy-policy-apply.sh <standard|standard-no-voice|strict>" >&2; exit 4 ;;
 esac
+
+PRIVACY_GROUP="${PRIVACY_GROUP:-TVGuard-Privacy}"
+PRIVACY_TARGETS="${PRIVACY_TARGETS:-}"
 
 if [ "$(id -u)" -ne 0 ]; then echo "run with sudo" >&2; exit 3; fi
 
@@ -57,14 +68,14 @@ bash "$SCRIPT_DIR/tvguard-apply.sh" || {
 
 # 3. Pi-hole part (dedicated group, scoped to applies_to clients)
 echo
-echo "== pushing domains to Pi-hole group TVGuard-Privacy =="
-PRIVACY_ROOT="$ROOT" PRIVACY_TIER="$TIER" python3 - <<'PYEOF'
+echo "== pushing domains to Pi-hole group $PRIVACY_GROUP =="
+PRIVACY_ROOT="$ROOT" PRIVACY_TIER="$TIER" PRIVACY_GROUP="$PRIVACY_GROUP" PRIVACY_TARGETS="$PRIVACY_TARGETS" python3 - <<'PYEOF'
 import json, os, re, sys, time, urllib.request, urllib.error, yaml
 
 ROOT = os.environ["PRIVACY_ROOT"]
 TIER = os.environ["PRIVACY_TIER"]
 BASE = "http://127.0.0.1:3001"
-GROUP_NAME = "TVGuard-Privacy"
+GROUP_NAME = os.environ.get("PRIVACY_GROUP", "TVGuard-Privacy")
 
 pw = ""
 for line in open(os.path.join(ROOT, ".env")):
@@ -72,7 +83,8 @@ for line in open(os.path.join(ROOT, ".env")):
         pw = line.strip().split("=", 1)[1]
 
 doc = yaml.safe_load(open(os.path.join(ROOT, "config", "privacy-policy.yaml")))
-targets = [str(x) for x in (doc.get("applies_to") or [])]
+_tv = os.environ.get("PRIVACY_TARGETS", "").split()
+targets = _tv if _tv else [str(x) for x in (doc.get("applies_to") or [])]
 resolved = json.load(open(os.path.join(ROOT, "data", "privacy-policy", "resolved.json")))
 domains = resolved[TIER]["domains"]
 print("  targets (applies_to): %s" % ", ".join(targets))
@@ -154,7 +166,11 @@ PYEOF
 
 echo
 echo "== done =="
-TARGETS=$(sed -n '/^applies_to:/,/^$/p' "$ROOT/config/privacy-policy.yaml" | grep -E '^[[:space:]]*-[[:space:]]*"' | sed -E 's/^[[:space:]]*-[[:space:]]*"([^"]+)".*/\1/' | paste -sd, -)
+if [ -n "$PRIVACY_TARGETS" ]; then
+  TARGETS=$(echo $PRIVACY_TARGETS | paste -sd, -)
+else
+  TARGETS=$(sed -n '/^applies_to:/,/^$/p' "$ROOT/config/privacy-policy.yaml" | grep -E '^[[:space:]]*-[[:space:]]*"' | sed -E 's/^[[:space:]]*-[[:space:]]*"([^"]+)".*/\1/' | paste -sd, -)
+fi
 echo "Tier $TIER is now ACTIVE for: ${TARGETS:-<applies_to>}"
 echo "Verify:  sudo scripts/privacy-policy-status.sh"
 echo "Undo:    sudo scripts/privacy-policy-disable.sh"

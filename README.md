@@ -14,11 +14,11 @@ Layers (all proven on kiaserver; the future dedicated box inherits this repo):
 4. **Evidence tooling** — per-session TV activity recording + comparison,
    evidence-ledger destination classification (`config/destinations.yaml`)
 5. **Privacy policy (researched, generated, tested — OFF by default)** —
-   exact-domain deny policy for the target TV(s) in two tiers
-   (`standard` / `strict`), resolved to IPs by an external resolver, applied
-   via a dedicated nftables set **and** a dedicated Pi-hole group, with a
-   documented keep-list that overrides everything. One command on, one off.
-   See `FINAL_BLOCKING_PLAN.md` before enabling.
+   exact-domain deny policy for the target TV(s) in three profiles
+   (`standard` / `standard-no-voice` / `strict`), resolved to IPs by an
+   external resolver, applied via a dedicated nftables set **and** a dedicated
+   Pi-hole group, with a documented keep-list that overrides everything. One
+   command on, one off. See `FINAL_BLOCKING_PLAN.md` before enabling.
 
 **Nothing here changes the live network until you point a TV at this box.**
 No DHCP, no router changes, no client redirection, no blanket firewalling of
@@ -48,7 +48,9 @@ REPORT.md               full report (read this first)
 ROUTER_NEXT_STEPS_V2.md your manual steps only (Hub + Samsung)
 ROLLBACK.md             one-command firewall rollback + full removal
 REVIEW_BEFORE_BLOCKING.md  human review dataset (destinations by category)
-FINAL_BLOCKING_PLAN.md   what standard/strict block, keep, force, leave working
+FINAL_BLOCKING_PLAN.md   what standard / standard-no-voice / strict block, keep, force, leave working
+TV_MANUAL_TEST_CHECKLIST.md  ordered physical TV tests with PASS/FAIL + diagnostics
+ENABLE_STANDARD_NO_VOICE.md  step-by-step enablement guide for the recommended profile
 MIGRATION_TO_DEDICATED_BOX.md  move this repo to the dedicated x86 box
 ```
 
@@ -75,7 +77,7 @@ MIGRATION_TO_DEDICATED_BOX.md  move this repo to the dedicated x86 box
 | `scripts/show-device-destinations.sh` | live conntrack view of a device's current connections | sudo |
 | `scripts/health-check.sh` | verify existing services + Pi-hole + TVGuard + safety invariants | sudo |
 | `scripts/privacy-policy-build.py` | resolve privacy-policy.yaml → resolved.json (external resolver, keep-list collision check) | python3 |
-| `scripts/privacy-policy-apply.sh` | **enable** standard/strict: firewall sets + Pi-hole group (idempotent, scoped to `applies_to`) | sudo |
+| `scripts/privacy-policy-apply.sh` | **enable** standard/standard-no-voice/strict: firewall sets + Pi-hole group (idempotent, scoped to `applies_to`) | sudo |
 | `scripts/privacy-policy-disable.sh` | **one-command privacy rollback**: removes only deny sets + Pi-hole group | sudo |
 | `scripts/privacy-policy-status.sh` | read-only privacy state (state file, nft sets, Pi-hole group) | sudo |
 | `scripts/privacy-policy-preview.sh` | show what the current resolved policy would block (no changes) | sudo |
@@ -97,11 +99,12 @@ sudo scripts/tvguard-selftest.sh
 ## Privacy policy (enable only when you've reviewed FINAL_BLOCKING_PLAN.md)
 
 ```
-sudo scripts/privacy-policy-apply.sh standard    # ACR + ads + high-conf telemetry + DoT
-sudo scripts/privacy-policy-apply.sh strict      # + Bixby/voice + low-conf telemetry + DoH-IP
-sudo scripts/privacy-live-check.sh               # verify (server-side + physical TV checklist)
-sudo scripts/privacy-watch.sh 30 --auto-rollback # safety watch
-sudo scripts/privacy-policy-disable.sh           # full privacy rollback (one command)
+sudo scripts/privacy-policy-apply.sh standard            # ACR + ads + high-conf telemetry + DoT
+sudo scripts/privacy-policy-apply.sh standard-no-voice   # + confirmed Bixby/voice (RECOMMENDED; breaks cloud voice only)
+sudo scripts/privacy-policy-apply.sh strict              # + low-conf telemetry + DoH-IP set
+sudo scripts/privacy-live-check.sh                       # verify (server-side + physical TV checklist)
+sudo scripts/privacy-watch.sh 30 --auto-rollback         # safety watch
+sudo scripts/privacy-policy-disable.sh                   # full privacy rollback (one command)
 ```
 
 The policy is EXACT domains only (no Samsung wildcards), resolved via 8.8.8.8

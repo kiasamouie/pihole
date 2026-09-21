@@ -20,6 +20,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"
 STATE_DIR=/var/lib/tvguard
 STATE_FILE="$STATE_DIR/privacy-state"
+# Testability override (default = production group name):
+#   PRIVACY_GROUP  which Pi-hole group to remove (mock cycles use a throwaway)
+PRIVACY_GROUP="${PRIVACY_GROUP:-TVGuard-Privacy}"
 
 if [ "$(id -u)" -ne 0 ]; then echo "run with sudo" >&2; exit 3; fi
 
@@ -38,13 +41,13 @@ bash "$SCRIPT_DIR/tvguard-apply.sh" || {
 }
 
 echo
-echo "== removing Pi-hole group TVGuard-Privacy and its domains =="
-PRIVACY_ROOT="$ROOT" python3 - <<'PYEOF'
+echo "== removing Pi-hole group $PRIVACY_GROUP and its domains =="
+PRIVACY_ROOT="$ROOT" PRIVACY_GROUP="$PRIVACY_GROUP" python3 - <<'PYEOF'
 import json, os, sys, urllib.request, urllib.error
 
 ROOT = os.environ["PRIVACY_ROOT"]
 BASE = "http://127.0.0.1:3001"
-GROUP_NAME = "TVGuard-Privacy"
+GROUP_NAME = os.environ.get("PRIVACY_GROUP", "TVGuard-Privacy")
 
 pw = ""
 for line in open(os.path.join(ROOT, ".env")):

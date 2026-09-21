@@ -7,11 +7,12 @@ table), Pi-hole-API-tested (temporary group, fully cleaned), and rollback-tested
 Activation is ONE explicit action by you:
 
 ```
-sudo scripts/privacy-policy-apply.sh standard    # ACR + ads + high-conf telemetry + DoT
-sudo scripts/privacy-policy-apply.sh strict      # + voice/Bixby + low-conf telemetry + DoH-IP
-sudo scripts/privacy-policy-disable.sh           # full privacy rollback (one command)
-sudo scripts/privacy-live-check.sh               # post-enable verification
-sudo scripts/privacy-watch.sh 30 --auto-rollback # 30-min safety watch
+sudo scripts/privacy-policy-apply.sh standard            # ACR + ads + high-conf telemetry + DoT
+sudo scripts/privacy-policy-apply.sh standard-no-voice   # + confirmed Bixby/voice cloud (RECOMMENDED)
+sudo scripts/privacy-policy-apply.sh strict              # + low-conf telemetry + DoH-IP set
+sudo scripts/privacy-policy-disable.sh                   # full privacy rollback (one command)
+sudo scripts/privacy-live-check.sh                       # post-enable verification
+sudo scripts/privacy-watch.sh 30 --auto-rollback         # 30-min safety watch
 ```
 
 ## 0. How enforcement works (two layers, same source of truth)
@@ -21,14 +22,24 @@ Source of truth: `config/privacy-policy.yaml` (deny) + `config/privacy-keep.yaml
 (never the local Pi-hole) → `data/privacy-policy/resolved.json` (git-ignored,
 ephemeral IPs, re-resolved on every apply).
 
+Profiles (per-entry `tiers:` lists, one source of truth):
+
+```
+standard            = tiers include "standard"
+standard-no-voice   = tiers include "standard" OR "voice"   (= standard + voice)
+strict              = ALL entries (superset) + DoH endpoint IP set
+```
+
 | Layer | What it does | Scope |
 |-------|--------------|-------|
 | nftables `table ip tvguard` | adds `tv_privacy_blocked` (strict: + `tv_doh_blocked`) IP sets + DROP rules in the forward chain for `ip saddr @tvs ... ct state new` | only the TVs in `applies_to` (currently .197 only) |
 | Pi-hole group `TVGuard-Privacy` | exact-domain denies pushed to a dedicated group; only the `applies_to` clients are attached | only attached clients |
 | keep-list | any deny IP that collides with a keep-list IP is removed from the firewall set; the keep list is never pushed to the deny group | global safety net |
 
-Current resolution (2026-09-21, via 8.8.8.8): **standard 35 domains → 123 IPs;
-strict 51 domains → 171 IPs; DoH 8 domains → 15 IPs. 0 unresolved.**
+Current resolution (2026-09-21 re-resolve, via 8.8.8.8): **standard 35 domains →
+129 IPs; standard-no-voice 37 domains → 135 IPs; strict 51 domains → 171 IPs;
+DoH 8 domains → 15 IPs. 0 unresolved.** (Exact IP counts drift with normal DNS
+changes — they are re-resolved on every apply; domain counts are stable.)
 
 Two important resolution notes:
 
@@ -89,6 +100,46 @@ sent from the TV; opt-out stops the traffic; no impact on playback.
 STANDARD will also, structurally:
 - DROP TV → any TCP/UDP **853** (DoT) — `TVGUARD-DOT`
 - keep forcing TV → any external **:53** to Pi-hole (existing TVGuard DNAT, unchanged)
+
+## 1b. STANDARD-NO-VOICE (the recommended profile)
+
+`standard-no-voice` = everything in §1 **plus** the confirmed Bixby/voice-cloud
+hosts — and nothing else. It is `standard + 2 voice domains` (verified by an
+automated assertion in the selftest), NOT an alias of strict.
+
+STANDARD-NO-VOICE WILL BLOCK (37 exact domains, ~135 IPs on current resolution):
+
+| Domain | Class | Note |
+|--------|-------|------|
+| (all 35 domains from §1: 17 ACR + 10 advertising + 8 high-conf telemetry) | ACR/ads/telemetry | unchanged from §1 |
+| prd-euw1-ucs.aibixby.com | voice-related | **observed on our TV**; cloud voice endpoint; intentional breakage |
+| provisioning-use2.mgmt.aibixby.com | voice-related | **observed**; voice service provisioning; intentional breakage |
+
+STANDARD-NO-VOICE WILL NOT BLOCK (explicitly excluded from this profile):
+- the 14 low-confidence strict-only telemetry domains from §5
+  (`nmetrics.samsung.com`, `smetrics.samsung.com`, `event-tracking.samsung.com`,
+  `fkp.*.samsungcloudsolution.{com,net}`, `oempprd.*`, `prov.*`, `sas.*`,
+  `vdterms.*`, `samsungdm.com`, the two `*.s3.amazonaws.com`, `2mdn.net`) —
+  verified absent by selftest assertion;
+- the DoH endpoint IP set (`dns.google`, `one.one.one.one`, …) — strict only;
+- everything in the keep list (privacy-keep.yaml — §2), which wins at both
+  the IP level (colliding IPs removed from the set) and is never pushed to the
+  deny group.
+
+STANDARD-NO-VOICE WILL FORCE:
+- TV → external DNS UDP/TCP 53 → **DNAT to Pi-hole** (same as standard);
+- TV → TCP/UDP 853 → **DROP + log** (`TVGUARD-DOT`).
+
+STANDARD-NO-VOICE WILL LEAVE WORKING:
+YouTube (incl. QUIC/UDP-443), Plex (LAN + Internet), Prime Video, Netflix,
+casting, Samsung home screen + app launching, app store, TV Plus / EPG,
+Samsung account + push, firmware/OTA updates, normal HTTPS (TCP 443),
+QUIC (UDP 443), all other household devices (policy scoped to .197 only).
+
+STANDARD-NO-VOICE WILL INTENTIONALLY BREAK:
+- Samsung/Bixby **cloud voice** (voice button commands, wake-word cloud
+  processing). On-device functionality and everything else are unaffected.
+  No *bixby/*voice/*assistant wildcard exists — only the two confirmed hosts.
 
 ## 2. STANDARD WILL NOT BLOCK (selected from privacy-keep.yaml — full file is the source of truth)
 
@@ -167,10 +218,11 @@ imported - most entries would be irrelevant and some are shared infrastructure).
 
 | Bucket | Count | Where |
 |--------|-------|-------|
-| BLOCK (standard) | 35 domains / 123 IPs | §1 |
-| BLOCK (strict adds) | 16 domains + 15 DoH IPs | §5, §6 |
+| BLOCK (standard) | 35 domains / 129 IPs | §1 |
+| BLOCK (standard-no-voice) | 37 domains / 135 IPs (= 35 + 2 voice) | §1b |
+| BLOCK (strict adds) | 14 low-conf domains + 15 DoH IPs | §5, §6 |
 | KEEP (documented) | ~30 domains / ~100 protected IPs | §2 (privacy-keep.yaml) |
-| OPTIONAL STRICT (voice) | 2 domains | §5 (only in strict) |
+| OPTIONAL STRICT (low-conf telemetry) | 14 domains | §5 (only in strict) |
 | UNKNOWN (NOT blocked) | 195 rows | hagezi-samsung-analysis.csv `unknown-review` |
 
 Every `unknown-review` row was deliberately NOT put into the policy. "In a
@@ -199,8 +251,13 @@ From `scripts/privacy-live-check.sh` output, plus:
 3. Plex: open, play
 4. Casting from phone (if used)
 5. App store opens and lists apps
-6. (standard) one voice command — should still work
-   (strict) voice should NOT work (intended) — confirm everything else works
+6. voice:
+   - (standard) one voice command — should still work
+   - (standard-no-voice / strict) voice should NOT work (intended) — confirm
+     everything else works
+
+Full per-test procedure with PASS/FAIL criteria and server diagnostics:
+`TV_MANUAL_TEST_CHECKLIST.md`.
 
 If anything breaks: `sudo scripts/privacy-policy-disable.sh`, find the failing
 domain in the Pi-hole query log, add it to `config/privacy-keep.yaml` if the

@@ -5,6 +5,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"
 STATE_DIR=/var/lib/tvguard
+# Testability override (default = production group name)
+PRIVACY_GROUP="${PRIVACY_GROUP:-TVGuard-Privacy}"
 
 echo "=== privacy state ==="
 if [ -f "$STATE_DIR/privacy-state" ]; then
@@ -23,11 +25,12 @@ else
 fi
 
 echo
-echo "=== Pi-hole group TVGuard-Privacy ==="
-PRIVACY_ROOT="$ROOT" python3 - <<'PYEOF' 2>/dev/null || echo "(Pi-hole API unreachable)"
+echo "=== Pi-hole group $PRIVACY_GROUP ==="
+PRIVACY_ROOT="$ROOT" PRIVACY_GROUP="$PRIVACY_GROUP" python3 - <<'PYEOF' 2>/dev/null || echo "(Pi-hole API unreachable)"
 import json, os, urllib.request, urllib.error
 ROOT = os.environ["PRIVACY_ROOT"]
 BASE = "http://127.0.0.1:3001"
+GROUP_NAME = os.environ.get("PRIVACY_GROUP", "TVGuard-Privacy")
 pw = ""
 for line in open(os.path.join(ROOT, ".env")):
     if line.startswith("ADMIN_PASSWORD="):
@@ -44,10 +47,10 @@ def req(method, path, body=None, sid=None):
 res = req("POST", "/api/auth", {"password": pw})
 sid = res["session"]["sid"]
 groups = {g["name"]: g["id"] for g in req("GET", "/api/groups", None, sid).get("groups", [])}
-if "TVGuard-Privacy" not in groups:
+if GROUP_NAME not in groups:
     print("(group absent - Pi-hole privacy layer OFF)")
 else:
-    gid = groups["TVGuard-Privacy"]
+    gid = groups[GROUP_NAME]
     rows = req("GET", "/api/domains?limit=100", None, sid).get("domains", [])
     mine = [d for d in rows if gid in (d.get("groupIDs") or d.get("groups") or [])]
     print("group id: %d | domains in group: %d" % (gid, len(mine)))

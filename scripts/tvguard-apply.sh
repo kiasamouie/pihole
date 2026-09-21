@@ -57,8 +57,8 @@ NFT_FILE="$STATE_DIR/tvguard.nft"
 TGUARD_TABLE="${TGUARD_TABLE:-tvguard}"
 
 # --- Privacy policy state (separate dimension from monitor/enforce) ----------
-# Set by scripts/privacy-policy-apply.sh (standard|strict) and privacy-policy-
-# disable.sh (off). When active, the resolved IP list produced by privacy-
+# Set by scripts/privacy-policy-apply.sh (standard|standard-no-voice|strict)
+# and privacy-policy-disable.sh (off). When active, the resolved IP list produced by privacy-
 # policy-build.py (data/privacy-policy/resolved.json) is rendered as an extra
 # DROP set in the forward chain. It never changes NAT, the DNS-bypass DNAT,
 # or the TVGuard monitor/enforce mode. When off, the rendered table is
@@ -69,7 +69,7 @@ PRIVACY_MODE="off"
 if [ -f "$PRIVACY_STATE_FILE" ]; then
   PRIVACY_MODE="$(sed -n 's/^PRIVACY=//p' "$PRIVACY_STATE_FILE" | tail -1)"
 fi
-case "$PRIVACY_MODE" in standard|strict) : ;; *) PRIVACY_MODE="off" ;; esac
+case "$PRIVACY_MODE" in standard|standard-no-voice|strict) : ;; *) PRIVACY_MODE="off" ;; esac
 PRIVACY_IPS=""
 PRIVACY_DOH_IPS=""
 if [ "$PRIVACY_MODE" != "off" ] && [ -f "$PRIVACY_RESOLVED" ] && command -v python3 >/dev/null 2>&1; then

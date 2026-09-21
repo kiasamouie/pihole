@@ -2,7 +2,7 @@
 #
 # privacy-live-check.sh - verify a privacy policy that has been ENABLED.
 #
-# Run AFTER:  sudo scripts/privacy-policy-apply.sh standard|strict
+# Run AFTER:  sudo scripts/privacy-policy-apply.sh standard|standard-no-voice|strict
 #
 # It checks everything that can be checked from the server side and ends with
 # the list of physical TV tests only YOU can perform (it cannot click the TV).
@@ -22,9 +22,22 @@ echo
 echo "=== 1. firewall layer ==="
 T=$(nft list table ip tvguard 2>/dev/null)
 echo "$T" | grep -q "tv_privacy_blocked" && ok "tv_privacy_blocked set present" || no "tv_privacy_blocked set missing"
-[ "$PRIVACY" = "strict" ] && { echo "$T" | grep -q "tv_doh_blocked" && ok "tv_doh_blocked set present (strict)" || no "tv_doh_blocked missing (strict expected)"; }
+if [ "$PRIVACY" = "strict" ]; then
+  echo "$T" | grep -q "tv_doh_blocked" && ok "tv_doh_blocked set present (strict)" || no "tv_doh_blocked missing (strict expected)"
+else
+  if echo "$T" | grep -q "tv_doh_blocked"; then
+    no "tv_doh_blocked present but not expected in $PRIVACY (DoH-IP set is strict-only)"
+  else
+    ok "no DoH-IP set (correct for $PRIVACY)"
+  fi
+fi
 echo "$T" | grep -q "TVGUARD-PRIVACY " && ok "privacy drop rule present" || no "privacy drop rule missing"
 echo "$T" | grep -q "TVGUARD-DOT " && ok "DoT :853 drop rule present" || no "DoT drop rule missing"
+if echo "$T" | grep -Eq '(tcp|udp)[[:space:]]+dport[[:space:]]+443'; then
+  no "a rule touches TCP/443 or UDP/443 (would break HTTPS/QUIC)"
+else
+  ok "no rule touches TCP/443 or UDP/443 (HTTPS + QUIC stay free)"
+fi
 echo "$T" | grep -q "masquerade" && ok "NAT/masquerade intact" || no "masquerade missing - check TVGuard!"
 echo "$T" | grep -q "dport 53 dnat" && ok "DNS-bypass DNAT intact" || no "DNS DNAT missing - check TVGuard!"
 N=$(echo "$T" | sed -n '/set tv_privacy_blocked/,/}/p' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -u | wc -l)
@@ -104,7 +117,7 @@ echo "  5. App store opens and lists apps"
 if [ "$PRIVACY" = "standard" ]; then
   echo "  6. (standard) voice search: should still work - confirm one command"
 else
-  echo "  6. (strict) voice: expected NOT to work (intended) - confirm everything else works"
+  echo "  6. ($PRIVACY) voice: expected NOT to work (intended Bixby/voice-cloud block) - confirm everything else works"
 fi
 echo
 echo "If anything breaks: sudo scripts/privacy-policy-disable.sh (one command, full privacy rollback)"

@@ -7,12 +7,19 @@
 # tvguard-apply.sh then renders the nftables part and privacy-policy-apply.sh
 # pushes the domain part into the dedicated Pi-hole group "TVGuard-Privacy".
 #
-# Tiers
-#   standard : ACR + advertising + high-confidence telemetry + DNS/DoT
-#              enforcement. Bixby/voice stays functional.
-#   strict   : everything in standard + voice/Bixby cloud + lower-confidence
-#              telemetry + known-DoH-endpoint IP blocking.
-#              NOTE: strict intentionally breaks cloud voice recognition.
+# Tiers (per entry, `tiers:` list) - one source of truth, no duplicated lists:
+#   standard : in standard, standard-no-voice and strict
+#   voice    : in standard-no-voice and strict (NOT in plain standard)
+#   strict   : in strict only
+#
+# Profiles (what the user can enable):
+#   standard          = ACR + advertising + high-confidence telemetry
+#                       + DNS/DoT enforcement. Bixby voice stays functional.
+#   standard-no-voice = standard + confirmed Bixby/voice cloud blocking.
+#                       NO low-confidence strict telemetry, NO DoH-IP set.
+#                       NOTE: intentionally breaks cloud voice recognition.
+#   strict            = standard-no-voice + lower-confidence telemetry +
+#                       known-DoH-endpoint IP blocking.
 #
 # Rules followed when building this list (see reports/07 and FINAL_BLOCKING_PLAN.md):
 #   * EXACT domains only. No *.samsung.com / *.samsungcloudsolution.com style
@@ -356,25 +363,27 @@ policies:
 
   voice:
     description: >
-      Bixby/voice-cloud infrastructure. STRICT ONLY. Blocking these endpoints
-      intentionally breaks cloud voice recognition; on-device functionality
-      unaffected. NOTE: no real voice session was ever captured, so these are
-      infrastructure-level classifications (persistent presence in every
-      active session), not proven transcript-upload endpoints.
+      Bixby/voice-cloud infrastructure. In standard-no-voice and strict.
+      Blocking these endpoints intentionally breaks cloud voice recognition;
+      on-device functionality unaffected. NOTE: no real voice session was
+      ever captured, so these are infrastructure-level classifications
+      (persistent presence in every active session), not proven
+      transcript-upload endpoints. Only the two confirmed, locally observed
+      Bixby hosts are blocked - we do NOT wildcard *bixby/*voice/*assistant.
     default: false
     entries:
       - domain: prd-euw1-ucs.aibixby.com
-        tiers: [strict]
+        tiers: [voice]
         confidence: medium
         observed_locally: true
         sources: [local-capture]
-        expected_breakage: "cloud voice recognition stops (intended in strict mode)"
+        expected_breakage: "cloud voice recognition stops (intended in standard-no-voice/strict)"
       - domain: provisioning-use2.mgmt.aibixby.com
-        tiers: [strict]
+        tiers: [voice]
         confidence: medium
         observed_locally: true
         sources: [local-capture, marq24]
-        expected_breakage: "voice service provisioning stops (intended in strict mode)"
+        expected_breakage: "voice service provisioning stops (intended in standard-no-voice/strict)"
 
   doh:
     description: >
@@ -441,7 +450,7 @@ policies:
 # the privacy state file; no per-domain resolution needed.
 structural:
   dns_53: "FORCE - TV -> any external :53 (udp/tcp) is DNAT'd to the local Pi-hole (existing TVGuard baseline, active in all modes; this is what makes hard-coded resolvers ineffective)"
-  dot_853: "DROP in standard+strict (tcp+udp, new connections, logged as TVGUARD-DOT)"
+  dot_853: "DROP in ALL profiles (standard, standard-no-voice, strict) - tcp+udp, new connections, logged as TVGUARD-DOT"
   doh_ips: "DROP in strict only, resolved at build time, keep-list overlap excluded"
   quic: "NEVER blocked - UDP/443 must remain usable for YouTube/streaming"
   https_443: "NEVER blocked"
