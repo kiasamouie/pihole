@@ -65,11 +65,26 @@ echo "  Now perform the TV action. Press nothing; the session ends automatically
 
 # --- nft counter snapshot (start) ----------------------------------------------
 nft_counters() {
-  nft list table ip tvguard 2>/dev/null | grep -E 'counter' | awk '
-    { pk=0; by=0; name="<rule>"
-      for(i=1;i<=NF;i++){ if($i=="packets")pk=$(i+1); if($i=="bytes")by=$(i+1)
-        if($i=="prefix"){ for(j=i+1;j<=NF;j++){ if($j ~ /^"/){ name=$j; break } } } }
-      printf "%d %d %s\n", pk, by, (name=="" ? "<accept>" : name) }' | sort
+  # Deterministic rule IDs: "<chain>.<n>" where n is the 1-based position of
+  # the counter-bearing rule inside that chain (nftables prints rules in
+  # table order, which tvguard-apply.sh renders in a fixed order).
+  # The OLD version named every unlabelled rule '<rule>' and sorted lines
+  # lexicographically, so when counter values re-ordered between snapshots the
+  # per-session delta silently mixed two DIFFERENT rules (e.g. the casting
+  # session's "1.4GB" was the reply-to-TV counter, not the TV's outbound).
+  nft list table ip tvguard 2>/dev/null | awk '
+    /chain / { for (i=1;i<=NF;i++) if ($i == "chain") { ch = $(i+1); n = 0 } next }
+    /counter/ {
+      n++
+      pk = ""; by = ""; pre = ""
+      for (i=1;i<=NF;i++) {
+        if ($i == "packets") pk = $(i+1)
+        if ($i == "bytes") by = $(i+1)
+        if ($i == "prefix") { for (j=i+1;j<=NF;j++) if ($j ~ /^"/) { pre = $j; break } }
+      }
+      gsub(/"/, "", pre)
+      if (pk != "" && by != "") printf "%s %s %s.%d%s\n", pk, by, ch, n, (pre != "" ? " " pre : "")
+    }'
 }
 nft_counters > "$OUT/nft-counters-start.txt"
 
@@ -94,25 +109,12 @@ if [ -f "$ROOT/.env" ]; then
         -d "{\"password\":\"$PW\"}" 2>/dev/null \
         | python3 -c 'import sys,json; print(json.load(sys.stdin)["session"]["sid"])' 2>/dev/null || true)
   if [ -n "${SID:-}" ]; then
-    python3 - "$SID" "$PH_IP" "$PH_PORT" "$TV_IP" "$T_START" "$T_END" <<'PYEOF' > "$OUT/pihole-queries.json"
-import json, sys, urllib.request
-sid, ip, port, tv, t0, t1 = sys.argv[1:7]
-t0, t1, port = int(t0), int(t1), int(port)
-out = []
-page = 0
-while True:
-    url = (f"http://{ip}:{port}/api/queries?client={tv}&from={t0}&to={t1}&limit=100&page={page}")
-    req = urllib.request.Request(url)
-    req.add_header("X-FTL-SID", sid)
-    with urllib.request.urlopen(req, timeout=10) as r:
-        body = json.loads(r.read().decode())
-    qs = body.get("queries", [])
-    out.extend(qs)
-    if len(qs) < 100:
-        break
-    page += 1
-print(json.dumps(out, indent=1))
-PYEOF
+    # fetch-pihole-queries.py handles v6 API pagination correctly (the API
+    # ignores `page=` and caps responses at 100 rows; it slices by time).
+    if ! python3 "$DIR/fetch-pihole-queries.py" --sid "$SID" "$PH_IP" "$PH_PORT" "$TV_IP" "$T_START" "$T_END" "$OUT/pihole-queries.json"; then
+      echo "  WARN: Pi-hole query fetch failed; dns.csv will be empty" >&2
+      echo "[]" > "$OUT/pihole-queries.json"
+    fi
   else
     echo "  WARN: Pi-hole API auth failed; dns.csv will be empty" >&2
     echo "[]" > "$OUT/pihole-queries.json"

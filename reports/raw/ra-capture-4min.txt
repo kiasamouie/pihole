@@ -1,2 +1,0 @@
-tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
-listening on enp2s0, link-type EN10MB (Ethernet), snapshot length 262144 bytes

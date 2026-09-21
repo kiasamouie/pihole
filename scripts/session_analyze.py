@@ -8,8 +8,10 @@ Invoked by scripts/tv-session.sh:
 
 Reads (from OUTDIR):
     events.log              timestamped `conntrack -E` lines
-    nft-counters-start.txt  "pkts bytes rulename" lines
-    nft-counters-end.txt
+    nft-counters-start.txt  "pkts bytes <chain>.<n> [logprefix]" lines
+                            (chain = forward|postrouting|prerouting, n = rule
+                             position within the chain; deterministic IDs so
+                             deltas never mix two different rules)
     pihole-queries.json     list of Pi-hole v6 API query objects
 
 Writes (into OUTDIR):
@@ -160,7 +162,11 @@ def main():
     dns_rows = []
     for q in queries:
         client = q.get("client") or {}
-        upstream = q.get("upstream") or {}
+        if isinstance(client, str):
+            client = {"ip": client}
+        upstream = q.get("upstream") or ""
+        if isinstance(upstream, dict):
+            upstream = upstream.get("ip", "")
         status = q.get("status", q.get("status_code", ""))
         try:
             status_name = DNS_STATUS.get(int(status), str(status))
@@ -175,8 +181,8 @@ def main():
             "type": q.get("type", ""),
             "status": status_name,
             "reply": reply,
-            "client_ip": client.get("ip", ""),
-            "upstream_ip": upstream.get("ip", ""),
+            "client_ip": client.get("ip", "") if isinstance(client, dict) else str(client),
+            "upstream_ip": str(upstream),
         })
 
     with open(f"{outdir}/dns.csv", "w", newline="", encoding="utf-8") as fh:
@@ -247,6 +253,11 @@ def main():
         L.append(f"| {dom} | {n} |")
     L.append("")
     L.append("## nftables counter deltas (tvguard table)")
+    L.append("")
+    L.append("Rule IDs are `<chain>.<n>` (n = 1-based rule position in that chain).")
+    L.append("In MONITOR mode: forward.1 = TV->LAN, forward.2 = TV->Internet NEW (logged),")
+    L.append("forward.3 = TV->Internet total, forward.4 = Internet->TV (return),")
+    L.append("forward.5 = non-TV traffic (pass-through), postrouting.1 = masquerade (new conns only).")
     L.append("")
     L.append("| rule | pkts delta | bytes delta |")
     L.append("|---|---|---|")

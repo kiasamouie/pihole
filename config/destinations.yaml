@@ -46,29 +46,644 @@
 #     - all entries -> the generated policy report (for human review)
 #   In MONITOR mode nothing here is enforced; it is logging only.
 #
-# The top-level `destinations:` list is a YAML array. Keep `ip:` empty for
-# domain-only entries.
+# ---------------------------------------------------------------------------
+# POPULATED from the live Samsung baseline sessions of 2026-09-20 UTC
+# (captures/20260920-213439..232943-samsung-{idle,youtube,plex,casting,
+#  voice,standby}; see reports/06-samsung-live-baseline.md).
+# NOTHING is class: blocked yet. blocking_status is not-tested everywhere.
+# ---------------------------------------------------------------------------
 
 destinations:
-  # --- No live entries yet. ---
-  # Nothing is classified, and therefore nothing is blocked, until evidence
-  # exists. Add entries as the tv-session.sh + compare-tv-sessions.py workflow
-  # produces evidence, e.g.:
-  #
-  # - domain: <fqdn seen in dns.csv>
-  #   ip: <dst IP from connections.csv, or "" if unknown>
-  #   class: telemetry
-  #   evidence: "Appears only in 'idle' and 'voice' sessions; 412KB out in 30s; absent during YouTube/Plex"
-  #   source: "captures/20260920-...-samsung-voice/summary.md; cross-checked against Samsung privacy documentation"
-  #   reason: "Correlated with background/voice use; no user-facing function identified"
-  #   confidence: medium
-  #   date-tested: "2026-09-20"
-  #   breakage: not-tested
-  #
-  # Note on Samsung seed domains (recorded for the first investigation pass, NOT
-  # classified): api.samsung.com, smarthings.samsungapis.com, ads.samsung.com,
-  # ads-qa.samsung.com were seen in community lists. They are listed here only as
-  # *things to look for* in the captures - none of them is classified until it is
-  # actually observed in our own sessions and cross-checked against a reputable
-  # source. Treat each the same way: observe first, classify with evidence, then
-  # mark class: blocked only after a test block shows no breakage.
+  # === ESSENTIAL (core TV/streaming function) ================================
+  - domain: www.youtube.com
+    ip: ""
+    class: essential
+    evidence: "Present in all 5 active sessions (idle 18, youtube 2, casting 14, voice 6, standby 12 queries); the user ran YouTube during youtube/idle windows"
+    source: "direct observation (dns.csv all sessions); the TV was used for YouTube"
+    reason: "YouTube app - core user function"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: i.ytimg.com
+    ip: ""
+    class: essential
+    evidence: "idle 8, youtube 4, casting 4 queries - YouTube thumbnail CDN"
+    source: "direct observation; i.ytimg.com is the well-known YouTube image CDN"
+    reason: "YouTube thumbnails/previews"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: yt3.ggpht.com
+    ip: ""
+    class: essential
+    evidence: "idle 6, casting 2 queries - Google profile-picture host (channel avatars)"
+    source: "direct observation; ggpht.com is Google's image host"
+    reason: "YouTube channel avatars"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: yt3.googleusercontent.com
+    ip: ""
+    class: essential
+    evidence: "casting 2 queries - Google user content host (YouTube avatars/thumbs)"
+    source: "direct observation"
+    reason: "YouTube content assets"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: lh3.googleusercontent.com
+    ip: ""
+    class: essential
+    evidence: "casting 2 queries - Google user content host"
+    source: "direct observation"
+    reason: "content assets"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: www.gstatic.com
+    ip: ""
+    class: essential
+    evidence: "casting 2 queries - Google static assets"
+    source: "direct observation"
+    reason: "static assets for Google/YouTube web components"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  # Google video CDN edge nodes seen streaming/serving YouTube content.
+  # rr{1,2,6,7}---sn-8pgbpohxqp5-aig{k,e7}.googlevideo.com
+  - domain: rr6---sn-8pgbpohxqp5-aigk.googlevideo.com
+    ip: ""
+    class: essential
+    evidence: "casting 6, standby 2 queries; UDP/443 (QUIC) flows to 142.251.x.x video edges in every media window"
+    source: "direct observation; googlevideo.com is Google's video CDN"
+    reason: "YouTube video streaming"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: rr1---sn-8pgbpohxqp5-aige7.googlevideo.com
+    ip: ""
+    class: essential
+    evidence: "idle 4 queries"
+    source: "direct observation"
+    reason: "YouTube video streaming"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: rr2---sn-8pgbpohxqp5-aigk.googlevideo.com
+    ip: ""
+    class: essential
+    evidence: "youtube 2, casting 2 queries"
+    source: "direct observation"
+    reason: "YouTube video streaming"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: rr7---sn-8pgbpohxqp5-aigk.googlevideo.com
+    ip: ""
+    class: essential
+    evidence: "idle 2 queries (FORWARDED)"
+    source: "direct observation"
+    reason: "YouTube video streaming"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: rr2---sn-8pgbpohxqp5-aige7.googlevideo.com
+    ip: ""
+    class: essential
+    evidence: "idle 2 queries"
+    source: "direct observation"
+    reason: "YouTube video streaming"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: d1itljbfuaik2i.cloudfront.net
+    ip: ""
+    class: likely-essential
+    evidence: "casting 2 queries; 13.226.119.0/24 + 13.224.89.237 (AWS CloudFront) among top media-window flows"
+    source: "direct observation; CloudFront distribution (serves YouTube thumbnails and app content among other things)"
+    reason: "CDN content for apps/thumbnails"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: img-resize-cdn-prod.samsungnyc.com
+    ip: ""
+    class: likely-essential
+    evidence: "youtube 6, casting 4, voice 2 queries; resolves to 104.18.18/19.218 (Cloudflare)"
+    source: "direct observation + resolution; Samsung image CDN (nyc division)"
+    reason: "image delivery for Samsung UI/apps"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: time.samsungcloudsolution.com
+    ip: ""
+    class: likely-essential
+    evidence: "casting 4 queries; resolves to 23.97.174.104 (Microsoft Azure)"
+    source: "direct observation + RDAP (MSFT); name indicates time service"
+    reason: "time synchronisation"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: lcprd1.samsungcloudsolution.net
+    ip: ""
+    class: likely-essential
+    evidence: "idle 4, youtube 2, casting 4, voice 2 queries; resolves to 34.160.212.185 (Google Cloud); persistent ESTABLISHED flow seen overnight"
+    source: "direct observation + RDAP (GOOGL)"
+    reason: "Samsung cloud solution production service"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: cdn.samsungcloudsolution.com
+    ip: ""
+    class: likely-essential
+    evidence: "youtube 1, casting 1 query; resolves to 62.252.115.x (UK NTLI)"
+    source: "direct observation"
+    reason: "Samsung CDN"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: play.samsungcloud.com
+    ip: ""
+    class: likely-essential
+    evidence: "casting 2 queries"
+    source: "direct observation; name indicates Samsung play/app services"
+    reason: "Samsung account/app-store related services"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: api.samsungcloud.com
+    ip: ""
+    class: likely-essential
+    evidence: "casting 2 queries; resolves to 52.50.x/54.229.x/52.18.x (AWS)"
+    source: "direct observation + resolution"
+    reason: "Samsung account/cloud API"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: gld.push.samsungosp.com
+    ip: ""
+    class: likely-essential
+    evidence: "idle 2, youtube 2, casting 4 queries; resolves to 34.247.x/52.208.x/52.210.x (AWS)"
+    source: "direct observation + resolution; name indicates global push service"
+    reason: "push notifications for installed apps"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: tvpnlinupepgpeu.samsungcloud.tv
+    ip: ""
+    class: likely-essential
+    evidence: "standby 12 queries (heaviest single domain in that window); resolves to 99.86.12.x (AWS CloudFront)"
+    source: "direct observation + resolution; name = EPG (electronic programme guide), EU line"
+    reason: "TV guide / programme data"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  # Samsung Smart-TV service backend ("qbe" platform; AWS-fronted)
+  - domain: osb-v2.samsungqbe.com
+    ip: ""
+    class: likely-essential
+    evidence: "youtube 2, casting 17 queries; 18.245.247.200 (AWS CloudFront)"
+    source: "direct observation + resolution; Samsung TV backend (unofficial name; qbe not documented by Samsung)"
+    reason: "Smart Hub service infrastructure"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: osb-apps-v2.samsungqbe.com
+    ip: ""
+    class: likely-essential
+    evidence: "youtube 8, casting 6 queries"
+    source: "direct observation; name indicates app services"
+    reason: "app store / app framework services"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: osb-eusvc-v2.samsungqbe.com
+    ip: ""
+    class: likely-essential
+    evidence: "casting 5 queries"
+    source: "direct observation; name indicates EU services"
+    reason: "Smart Hub service infrastructure"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: osb-ussvc-v2.samsungqbe.com
+    ip: ""
+    class: likely-essential
+    evidence: "casting 2 queries"
+    source: "direct observation"
+    reason: "Smart Hub service infrastructure"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: osb-auth-eusvc-v2.samsungqbe.com
+    ip: ""
+    class: likely-essential
+    evidence: "casting 2 queries"
+    source: "direct observation; name indicates authentication service"
+    reason: "Samsung account authentication"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: osb-tnc-v2-appsacc.samsungqbe.com
+    ip: ""
+    class: likely-essential
+    evidence: "casting 2 queries"
+    source: "direct observation"
+    reason: "app/account service"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: gpm.samsungqbe.com
+    ip: ""
+    class: likely-essential
+    evidence: "casting 6 queries; 108.132.31.117/52.49.107.199/52.213.214.204 (AWS global accelerator)"
+    source: "direct observation + resolution"
+    reason: "Smart Hub service infrastructure (gpm = gateway/portal mgmt, unverified)"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: unagi-eu.amazon.com
+    ip: ""
+    class: likely-essential
+    evidence: "idle 6, youtube 2, casting 2, standby 2 queries; 3.254.239.211/3.253.168.113/3.251.216.53 (AWS); matches observed 3.253/3.254 flows"
+    source: "direct observation + resolution; 'unagi' is Amazon's on-device/app service endpoint family (Alexa & Amazon app on Samsung TVs)"
+    reason: "Alexa / Amazon app on the TV"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: api.amazon.co.uk
+    ip: ""
+    class: likely-essential
+    evidence: "idle 2 queries (FORWARDED); 3.253.168.177 (AWS)"
+    source: "direct observation + resolution"
+    reason: "Amazon UK API (Alexa skills / Amazon app)"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: tools.google.com
+    ip: ""
+    class: likely-essential
+    evidence: "casting 2 queries; 142.250.129.x (Google)"
+    source: "direct observation"
+    reason: "Google client services (time, device checks)"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: clients1.google.com
+    ip: ""
+    class: likely-essential
+    evidence: "casting 2 queries; 142.251.29.x (Google)"
+    source: "direct observation"
+    reason: "Google client services (time/NTP, misc)"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: mediaservices.cdn-apple.com
+    ip: ""
+    class: likely-essential
+    evidence: "casting 2 queries; 62.253.3.x (UK NTLI); observed in the same window as mDNS 224.0.0.251:5353 and a local 192.168.0.128:32400 (Plex) flow - consistent with screen-mirroring/casting from an Apple device or the Apple TV app"
+    source: "direct observation + RDAP (NTLI hosting); Apple media services CDN"
+    reason: "Apple media/mirroring content during casting"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  # === UNKNOWN (no user-facing function identified yet) =====================
+  - domain: fc.samsungcloud.tv
+    ip: ""
+    class: unknown
+    evidence: "casting 30 queries (heaviest Samsung domain in that window); 216.137.53.x (AWS). Purpose not verified; candidate firmware/framework check triggered when apps were opened"
+    source: "direct observation + resolution; name unverified"
+    reason: "purpose not yet determined"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: mobile-data.onetrust.io
+    ip: ""
+    class: unknown
+    evidence: "casting 2 queries; 172.64.155.231/104.18.32.25 (Cloudflare)"
+    source: "direct observation; OneTrust is a consent-management platform (used by web apps/webviews)"
+    reason: "consent/cookie management data for an app or webview"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  # Samsung persistent TCP/5229 control channels (AWS). Long-lived, re-SYN'd
+  # periodically (observed 22:49 UTC and 00:45 UTC). No DNS name correlates
+  # (raw-IP, likely hard-coded or resolved long ago).
+  - domain: 34.255.156.109
+    ip: 34.255.156.109
+    class: unknown
+    evidence: "persistent ESTABLISHED TCP/5229 (AWS Dublin); re-SYN'd 22:49 UTC"
+    source: "conntrack + TVGUARD-NEW logs + RDAP (Amazon); community reports attribute 5229 to Samsung Smart Hub channels"
+    reason: "long-lived Samsung cloud channel, purpose unverified"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: 63.33.78.19
+    ip: 63.33.78.19
+    class: unknown
+    evidence: "persistent ESTABLISHED TCP/5229 (AWS Dublin); 431,732 packets on the flow at 08:43 UTC"
+    source: "conntrack + RDAP"
+    reason: "long-lived Samsung cloud channel, purpose unverified"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: 54.78.39.206
+    ip: 54.78.39.206
+    class: unknown
+    evidence: "persistent ESTABLISHED TCP/5229 (AWS Dublin)"
+    source: "conntrack + RDAP"
+    reason: "long-lived Samsung cloud channel, purpose unverified"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: 34.240.60.17
+    ip: 34.240.60.17
+    class: unknown
+    evidence: "casting 1 flow TCP/5229 (AWS Dublin)"
+    source: "conntrack + RDAP"
+    reason: "long-lived Samsung cloud channel, purpose unverified"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: 63.34.205.144
+    ip: 63.34.205.144
+    class: unknown
+    evidence: "persistent ESTABLISHED TCP/5229 (AWS Dublin); new SYN 00:45 UTC"
+    source: "conntrack + TVGUARD-NEW log + RDAP"
+    reason: "long-lived Samsung cloud channel, purpose unverified"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: 52.31.176.228
+    ip: 52.31.176.228
+    class: unknown
+    evidence: "new SYN TCP/5229 at 00:45 UTC (AWS Dublin)"
+    source: "TVGUARD-NEW kernel log + RDAP"
+    reason: "long-lived Samsung cloud channel, purpose unverified"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  # Virgin/NTLI-hosted 443 endpoints (content delivered via the local ISP's
+  # infrastructure - possibly Samsung or third-party UK CDN).
+  - domain: 213.104.27.12
+    ip: 213.104.27.12
+    class: unknown
+    evidence: "idle 2 tcp + 2 udp flows on 443; RDAP: UK-NTLI / Virgin Media (AS5089)"
+    source: "conntrack + RDAP"
+    reason: "content delivery on ISP-hosted infrastructure, identity unverified"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: 213.104.27.13
+    ip: 213.104.27.13
+    class: unknown
+    evidence: "idle 3 udp + 0 tcp flows on 443; RDAP: UK-NTLI / Virgin Media"
+    source: "conntrack + RDAP"
+    reason: "content delivery on ISP-hosted infrastructure, identity unverified"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: 108.128.173.155
+    ip: 108.128.173.155
+    class: unknown
+    evidence: "standby 1 flow TCP/443 (AWS Dublin)"
+    source: "conntrack + RDAP"
+    reason: "likely Samsung/AWS service, unverified"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: 34.241.13.242
+    ip: 34.241.13.242
+    class: unknown
+    evidence: "standby 1 flow TCP/443 (AWS Dublin)"
+    source: "conntrack + RDAP"
+    reason: "likely Samsung/AWS service, unverified"
+    confidence: low
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  # === DNS-BYPAS (observed attempt, NOT a domain) ===========================
+  - domain: 194.168.4.100
+    ip: 194.168.4.100
+    class: unknown
+    evidence: "idle 3 UDP/53 packets dst=194.168.4.100 (Virgin Media internal resolver, RDAP: VIRGIN-MEDIA/AS5089 - same resolver as kiaserver's own /etc/resolv.conf). Transparently DNATed to Pi-hole by TVGuard prerouting in monitor mode."
+    source: "TVGUARD-NEW kernel log + nft table + RDAP"
+    reason: "stale DHCP DNS or app-level override trying to bypass Pi-hole; redirect works, not blocked"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  # === ANALYTICS =============================================================
+  - domain: eligibility-panelresearch.googlevideo.com
+    ip: ""
+    class: analytics
+    evidence: "casting 2 queries (FORWARDED); 142.251.29.x (Google)"
+    source: "direct observation; name indicates Google user-research panel eligibility"
+    reason: "user-research eligibility check (YouTube/Google)"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  # === ADVERTISING ===========================================================
+  - domain: googleads.g.doubleclick.net
+    ip: 192.178.223.154
+    class: advertising
+    evidence: "idle 2, casting 2 queries; 192.178.223.0/24 (Google); UDP/443 flows to .119/.132 during idle"
+    source: "direct observation + RDAP (Google); doubleclick.net is Google's ad network"
+    reason: "ad serving / ad measurement"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: static.doubleclick.net
+    ip: ""
+    class: advertising
+    evidence: "casting 2 queries; 172.217.76.x (Google)"
+    source: "direct observation; DoubleClick ad asset host"
+    reason: "ad assets/verification"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  # adgrx = ad exchange used by Samsung TVs for third-party ad buying (RTB)
+  - domain: catalyst.adgrx.com
+    ip: ""
+    class: advertising
+    evidence: "youtube 2 queries (FORWARDED); 34.240.131.229 (AWS)"
+    source: "direct observation + resolution; name/context indicate ad exchange (no official Samsung documentation found)"
+    reason: "third-party ad exchange bidding"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: rtb.adgrx.com
+    ip: ""
+    class: advertising
+    evidence: "casting 4 queries; 52.19.224.221 (AWS)"
+    source: "direct observation + resolution"
+    reason: "real-time-bidding ad exchange"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: tvx.adgrx.com
+    ip: ""
+    class: advertising
+    evidence: "youtube 2 (CACHE_STALE/FORWARDED), casting 2 queries; 34.243.118.177 (AWS)"
+    source: "direct observation + resolution"
+    reason: "ad exchange (TV)"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: rtb-config.samsungads.com
+    ip: ""
+    class: advertising
+    evidence: "casting 1 query; 54.162.159.37/54.237.106.192/50.17.7.32 (AWS)"
+    source: "direct observation; samsungads.com is Samsung's ad platform"
+    reason: "RTB configuration for Samsung ad system"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: tvp-ads-log.samsungads.com
+    ip: ""
+    class: advertising
+    evidence: "casting 1 query; 44.217.123.171/3.232.43.57/34.239.90.46 (AWS)"
+    source: "direct observation; samsungads.com is Samsung's ad platform"
+    reason: "ad logging/impression reporting"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  # === TELEMETRY ==============================================================
+  # ACR = Automatic Content Recognition: Samsung's documented feature that
+  # samples what is on screen and uploads fingerprints for measurement.
+  # (Samsung support docs + independent security research; see report 06.)
+  - domain: log-ingestion-eu.samsungacr.com
+    ip: ""
+    class: telemetry
+    evidence: "ALL 5 active sessions (idle 4, youtube 2, casting 4, voice 2, standby 4); 18.203.131.210/52.31.162.23/63.34.234.233 (AWS) - the steady background 'heartbeat' of this TV"
+    source: "direct observation + Samsung ACR documentation + security research on Samsung ACR frame-fingerprinting"
+    reason: "ACR telemetry ingestion (content measurement)"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: log-config.samsungacr.com
+    ip: ""
+    class: telemetry
+    evidence: "casting 2 queries; 35.169.253.43/34.197.82.150/3.234.95.195 (Atos/AWS)"
+    source: "direct observation + Samsung ACR documentation"
+    reason: "ACR configuration endpoint"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: qoe.samsungcloud.tv
+    ip: ""
+    class: telemetry
+    evidence: "casting 2 queries; 34.250.239.47/34.252.110.18/54.216.136.66 (AWS)"
+    source: "direct observation; name = QoE (quality-of-experience) reporting"
+    reason: "streaming quality telemetry"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: nrdp.logs.netflix.com
+    ip: ""
+    class: telemetry
+    evidence: "idle 5, youtube 2 queries; 54.229.239.201/3.254.26.105/54.246.169.239 (AWS); present whenever the Netflix app context is active"
+    source: "direct observation; 'nrdp' = Netflix remote diagnostics (community/research reports)"
+    reason: "Netflix diagnostics/telemetry"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  # === VOICE-RELATED (Bixby) ==================================================
+  - domain: prd-euw1-ucs.aibixby.com
+    ip: ""
+    class: voice-related
+    evidence: "idle 8, youtube 4, casting 4 queries; 108.133.12.121/63.33.218.101/54.194.205.84 (AWS) - matches observed 3.253/108.133 flows; aibixby.com is Samsung's Bixby (voice assistant) cloud"
+    source: "direct observation + resolution + naming (aibixby = AI Bixby)"
+    reason: "Bixby voice assistant cloud service (background channel)"
+    confidence: high
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  - domain: provisioning-use2.mgmt.aibixby.com
+    ip: ""
+    class: voice-related
+    evidence: "casting 4 queries (FORWARDED); 3.149.37.111/52.14.215.191/3.20.117.82 (AWS us-east)"
+    source: "direct observation + resolution"
+    reason: "Bixby provisioning/management (pulled when voice features initialise)"
+    confidence: medium
+    date-tested: "2026-09-20"
+    breakage: not-tested
+
+  # === POST-SESSION OBSERVATIONS (not part of the six baseline sessions) =====
+  # Seen in live Pi-hole query log on 2026-09-21 ~08:57 UTC while the TV was
+  # on and the user was browsing (Prime Video app context observed).
+  # No session capture covers these yet - classify further after a dedicated
+  # 'amazonvideo' session run.
+  - domain: global.telemetry.insights.video.a2z.com
+    ip: ""
+    class: unknown
+    evidence: "4 queries (CACHE) in live query log 2026-09-21 ~08:57 UTC, concurrent with Prime Video API queries; not covered by any baseline session"
+    source: "direct observation only; name suggests Amazon Prime Video telemetry but no research verified from this host"
+    reason: "Likely Amazon Prime Video telemetry; unverified - do not block without a session capture first"
+    confidence: low
+    date-tested: "2026-09-21"
+    breakage: not-tested
+
+  - domain: api.amazonvideo.com
+    ip: ""
+    class: unknown
+    evidence: "live query log 2026-09-21 ~08:57 UTC: api.amazonvideo.com, qgmg.api.amazonvideo.com, avpk-*.api.amazonvideo.com, minerva.devices.a2z.com, api.amazon.com, m.media-amazon.com (Prime Video app context)"
+    source: "direct observation only"
+    reason: "Likely Amazon Prime Video app API/CDN; unverified - likely-essential if the user watches Prime Video"
+    confidence: low
+    date-tested: "2026-09-21"
+    breakage: not-tested

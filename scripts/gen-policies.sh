@@ -22,7 +22,7 @@ parse_rows() {
   awk '
     function trim(s){ gsub(/^[[:space:]]+/,"",s); gsub(/[[:space:]]+$/,"",s); return s }
     /^[[:space:]]*-[[:space:]]*domain:/ {
-      if (dom!="") print dom"|"|ip"|"|cls"|"|conf"|"|ev
+      if (dom!="") print dom"|"ip"|"cls"|"conf"|"ev
       dom=""; ip=""; cls="unknown"; conf=""; ev=""
       d=$0; sub(/^.*domain:[[:space:]]*/,"",d); dom=trim(d); next
     }
@@ -30,7 +30,7 @@ parse_rows() {
     /^[[:space:]]*class:[[:space:]]*/  { v=$0; sub(/^.*class:[[:space:]]*/,"",v); cls=trim(v) }
     /^[[:space:]]*confidence:[[:space:]]*/ { v=$0; sub(/^.*confidence:[[:space:]]*/,"",v); conf=trim(v) }
     /^[[:space:]]*evidence:[[:space:]]*/ { v=$0; sub(/^.*evidence:[[:space:]]*/,"",v); ev=trim(v) }
-    END { if (dom!="") print dom"|"|ip"|"|cls"|"|conf"|"|ev }
+    END { if (dom!="") print dom"|"ip"|"cls"|"conf"|"ev }
   ' "$YAML"
 }
 

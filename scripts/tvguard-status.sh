@@ -41,7 +41,7 @@ nft list table ip tvguard 2>/dev/null | grep -E 'counter' | sed 's/^ *//' | awk 
 }' 2>/dev/null || echo "  (no counters yet)"
 
 echo; echo "=== ufw route rules (per-TV forward allowance) ==="
-UFW_RULES=$(iptables -t filter -S ufw-user-forward 2>/dev/null | grep -F "-j ACCEPT" | sed 's/^ *//')
+UFW_RULES=$(iptables -t filter -S ufw-user-forward 2>/dev/null | grep -F -e "-j ACCEPT" | sed 's/^ *//')
 if [ -n "$UFW_RULES" ]; then echo "$UFW_RULES" | sed 's/^/  /'; else echo "  (none)"; fi
 
 echo; echo "=== relevant sysctls ==="
