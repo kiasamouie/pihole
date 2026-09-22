@@ -1,0 +1,1944 @@
+# Machine-readable LG webOS domain inventory — sources: furkan-bayrak/lg-tv-blocklist
+# and Perflyst/PiHoleBlocklist (SmartTV.txt, LG section + alphonso.tv).
+#
+# Research date: 2026-09-22. Companion docs: lg-tv-blocklist.md, perflyst-lg.md.
+#
+# source_rank legend:
+#   A = peer-reviewed (none exist in this space)
+#   B = maintained tracker with documented, reproducible methodology
+#   C = community source with observations (querylogs, issue reports, journalistic)
+#   D = anecdotal / unverified
+#
+# suggested_action legend:
+#   BLOCK    = proven telemetry/ad; blocking verified safe or high privacy value with no breakage evidence
+#   KEEP     = blocking breaks TV function (time sync, store, billing, OTA) — do not block
+#   OPTIONAL = user's call (dual-use, feature-kill trade-off, unverified function, family risk)
+#   UNKNOWN  = function unproven
+#
+# wildcard: true means the record is a pattern/zone anchor, or an enumerated host set that
+# behaves like a pattern. "justified" states whether the pattern is evidence-backed.
+#
+# Overlapping domains (present in both sources) are merged into ONE record listing all
+# sources; per-source file/line references are kept in `source`.
+
+meta:
+  generated: "2026-09-22"
+  sources:
+    - id: furkan
+      repo: "https://github.com/furkan-bayrak/lg-tv-blocklist"
+      files:
+        - "src/safe.txt (19 entries: 10 live, 9 decommissioned-kept)"
+        - "src/strict.txt (86-entry delta: 32 non-cluster + 53 cluster + 1 interop)"
+        - "src/zones.txt (9 STRICT-only zone anchors)"
+      compiled: "strict = 114 (safe 19 + delta 86 + zones 9)"
+      state: "created 2026-09-09, last push 2026-09-16, 99 commits, 214 stars; CI-gated build; G1 root-level audit basis"
+      rank: B
+    - id: perflyst
+      repo: "https://github.com/Perflyst/PiHoleBlocklist"
+      files:
+        - "SmartTV.txt, branch master, last push 2026-09-09; header stale (13July2023v1)"
+      lg_entries: "276 active (29 non-cc + 246 <cc>.nextlgsdp.com + alphonso.tv) + 2 commented-out (documented breakage)"
+      rank: C
+  cluster_key:
+    eic: "Europe datacentre cluster"
+    aic: "Americas datacentre cluster"
+    kic: "Korea datacentre cluster"
+    note: "Cluster prefix is independent of the <cc> country-code prefix; separator varies (eic.x vs eic-x). Existence DNS-verified 2026-09-12 (furkan PR #7); TLS certs validate to LG 62/65 (PR #14); lgthinq.com is the Azure exception."
+
+records:
+
+  # ======================= furkan SAFE (live, G1 traffic-verified) =======================
+
+  - domain: eic.nudge.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/safe.txt", "perflyst:PR #170 (proposed)"]
+    source_rank: B
+    status: active
+    purpose: nudge/notification telemetry
+    confidence: high
+    evidence: "G1 audit (webOS 6, DE): live DNS + traffic; live-blocking verified (apps fine); 44.8k-packet capture + 267k-query log basis"
+    shared_infrastructure: "eic cluster twin; aic./kic. forms exist (strict tier)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "Per-source tiering: SAFE. aic./kic. twins stay STRICT (DNS-only evidence) per repo policy"
+
+  - domain: eic.wiseconfig.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/safe.txt", "perflyst:PR #170 (proposed)"]
+    source_rank: B
+    status: active
+    purpose: cloud-config telemetry
+    confidence: high
+    evidence: "G1 audit; blocked live on G1 with no app impact"
+    shared_infrastructure: "eic cluster twin; aic./kic. forms exist (strict tier)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: eic.lgtviot.com
+    family: lgtviot.com
+    source: ["furkan:src/safe.txt", "perflyst:PR #170 (proposed)"]
+    source_rank: B
+    status: active
+    purpose: IoT telemetry (largest observed family, ~5.1k queries)
+    confidence: high
+    evidence: "G1 audit; largest single family in the capture; live-blocking verified"
+    shared_infrastructure: "eic cluster twin; aic./kic. forms exist (strict tier)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: eic.api.lgtviot.com
+    family: lgtviot.com
+    source: ["furkan:src/safe.txt", "perflyst:PR #170 (proposed)"]
+    source_rank: B
+    status: active
+    purpose: IoT telemetry API
+    confidence: high
+    evidence: "G1 audit; live-blocking verified"
+    shared_infrastructure: "eic cluster twin; aic./kic. forms exist (strict tier)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: eic.tv.wiselg.com
+    family: wiselg.com
+    source: ["furkan:src/safe.txt", "perflyst:PR #170 (proposed)"]
+    source_rank: B
+    status: active
+    purpose: TV telemetry
+    confidence: high
+    evidence: "G1 audit; blocked live with no app impact"
+    shared_infrastructure: "eic cluster twin; aic./kic. forms exist (strict tier)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: de.nextlgsdp.com
+    family: nextlgsdp.com
+    source: ["furkan:src/safe.txt", "perflyst:SmartTV.txt:184 (in 246-cc block)"]
+    source_rank: B
+    status: active
+    purpose: SDP regional endpoint — telemetry (G1 DE, live-observed)
+    confidence: medium
+    evidence: "G1 audit traffic; BUT hagezi/dns-blocklists#11438 documents time-sync breakage when nextlgsdp family is blocked on some models; furkan deliberately refused to generalise the region pattern and allowlists de.lgtvsdp.com + de.ibs.nextlgsdp.com"
+    shared_infrastructure: "nextlgsdp SDP family = mixed telemetry + time-sync + billing on some models"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "EXACT HOST ONLY. Family is unsafe for wildcards. If your model lacks a fallback time source (see furkan issue #6), treat as KEEP"
+
+  - domain: ca.nextlgsdp.com
+    family: nextlgsdp.com
+    source: ["furkan:src/safe.txt", "perflyst:SmartTV.txt:165 (in 246-cc block)", "perflyst:issue context PR #9 (furkan)"]
+    source_rank: C
+    status: active
+    purpose: SDP Canada region endpoint — telemetry
+    confidence: medium
+    evidence: "Single LG C1 (Canada): ~1 query/min after power-on + local Plex playback; querylog.json attached to furkan PR #9; unreplicated"
+    shared_infrastructure: "nextlgsdp SDP family = mixed (time/billing risk on some models)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "EXACT HOST ONLY; same family caveats as de.nextlgsdp.com"
+
+  - domain: lgsmartad.com
+    family: lgsmartad.com
+    source: ["furkan:src/safe.txt", "perflyst:PR #170 (proposed)"]
+    source_rank: B
+    status: active
+    purpose: dedicated ad-zone apex (whole family is ads)
+    confidence: high
+    evidence: "G1 audit; admanager polling observed (~60s cadence on info.*); region probes show live <cc>.info.lgsmartad.com in 49/49 codes"
+    shared_infrastructure: "LG ad family only"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "Apex row: in adblock format this is the whole zone (safe here); in exact-name formats it matches the apex only"
+
+  - domain: de.info.lgsmartad.com
+    family: lgsmartad.com
+    source: ["furkan:src/safe.txt", "perflyst:PR #170 (proposed)"]
+    source_rank: B
+    status: active
+    purpose: ad-info endpoint, region-scoped
+    confidence: high
+    evidence: "G1 audit; region family live in 49/49 country probes (furkan issue #10)"
+    shared_infrastructure: "LG ad family only"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "[REGION-SCOPED] — do not generalise to <cc>.info.lgsmartad.com without per-region check (furkan ships a Pi-hole regex output for it)"
+
+  - domain: de.emp.lgsmartplatform.com
+    family: lgsmartplatform.com
+    source: ["furkan:src/safe.txt", "perflyst:PR #170 (proposed)"]
+    source_rank: B
+    status: active
+    purpose: smart-platform telemetry
+    confidence: high
+    evidence: "G1 audit; CNAME proves cluster split: de.emp -> eic-emp-lgsmartplatform-com.lgemp-prd.net (AWS eu-west-1), us.emp -> aic-emp-... (us-west-2)"
+    shared_infrastructure: "eic cluster (emp stem); regional siblings <cc>.emp uncovered except this"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "[REGION-SCOPED]; furkan regex output covers <cc>.emp.lgsmartplatform.com"
+
+  # ======================= furkan SAFE (decommissioned 2026-09-12, kept for audit) =======================
+
+  - domain: cdpbeacon.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/safe.txt (decommissioned)"]
+    source_rank: B
+    status: decommissioned
+    purpose: ACR beacon ("what are you watching" reporting), ~6-min heartbeat
+    confidence: high
+    evidence: "G1 audit: 6-min cadence observed. NXDOMAIN 2026-09-12 (Google+Cloudflare DoH); service MOVED to eic./aic./kic.cdpbeacon.lgtvcommon.com"
+    shared_infrastructure: "successors are the live eic/aic/kic cluster names"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "Blocking the dead name is harmless; the live successors are separate records below. This move caused a silent-unblock window for exact-name list users"
+
+  - domain: ads.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/safe.txt (decommissioned)"]
+    source_rank: B
+    status: decommissioned
+    purpose: ad delivery
+    confidence: medium
+    evidence: "observed in G1 audit; NXDOMAIN 2026-09-12; moved to eic./aic./kic.ads.lgtvcommon.com"
+    shared_infrastructure: "cluster twins are the live names"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: homeprv.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/safe.txt (decommissioned)"]
+    source_rank: B
+    status: decommissioned
+    purpose: home-screen provisioning/promos
+    confidence: medium
+    evidence: "observed in G1 audit; NXDOMAIN 2026-09-12; moved to cluster twins"
+    shared_infrastructure: "cluster twins are the live names"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: recommend.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/safe.txt (decommissioned)"]
+    source_rank: B
+    status: decommissioned
+    purpose: recommendations/promos
+    confidence: medium
+    evidence: "observed in G1 audit; NXDOMAIN 2026-09-12; moved to cluster twins"
+    shared_infrastructure: "cluster twins are the live names"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: info.lgsmartad.com
+    family: lgsmartad.com
+    source: ["furkan:src/safe.txt (decommissioned)", "Level1Techs #255178 (G5, live there)"]
+    source_rank: C
+    status: decommissioned
+    purpose: ad-info endpoint (admanager poll ~60s)
+    confidence: medium
+    evidence: "dead on G1 (NXDOMAIN 2026-09-12); live on a G5 per Level1Techs recon 2026-08-24 — firmware/model dependent"
+    shared_infrastructure: "region-scoped successors <cc>.info.lgsmartad.com live in 49/49"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "Bare name dead; the family lives on via region-scoped names"
+
+  - domain: smart.adtvc.app
+    family: adtvc.app
+    source: ["furkan:src/safe.txt (decommissioned)"]
+    source_rank: C
+    status: decommissioned
+    purpose: ad serving (adtvc.app family)
+    confidence: low
+    evidence: "observed in G1 audit; NXDOMAIN 2026-09-12"
+    shared_infrastructure: "ad-only zone"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: adsdtvc.com
+    family: adsdtvc.com
+    source: ["furkan:src/safe.txt (decommissioned)"]
+    source_rank: C
+    status: decommissioned
+    purpose: ad zone
+    confidence: low
+    evidence: "observed in G1 audit; NXDOMAIN 2026-09-12"
+    shared_infrastructure: "ad-only zone"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: ad.lgappstv.com
+    family: lgappstv.com
+    source: ["furkan:src/safe.txt (decommissioned)", "perflyst:SmartTV.txt:97 (active)"]
+    source_rank: B
+    status: decommissioned
+    purpose: ad delivery on the lgappstv store-CDN family
+    confidence: medium
+    evidence: "observed in G1 audit; NXDOMAIN 2026-09-12 (furkan). Perflyst still lists it active — likely stale row"
+    shared_infrastructure: "lgappstv store-CDN family (store itself unaffected by ad.* per audit)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "dead name; harmless to keep blocking"
+
+  - domain: initscr.lge.com
+    family: lge.com
+    source: ["furkan:src/safe.txt (decommissioned)"]
+    source_rank: B
+    status: decommissioned
+    purpose: initial-setup telemetry (boot-time only)
+    confidence: medium
+    evidence: "observed in G1 audit at boot; NXDOMAIN 2026-09-12"
+    shared_infrastructure: "lge.com zone (do NOT use zone-wide block — see lge.com record)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  # ======================= furkan STRICT — non-cluster (32) =======================
+
+  - domain: snu.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt"]
+    source_rank: B
+    status: active
+    purpose: firmware OTA check server
+    confidence: medium
+    evidence: "G1 audit; STRICT tier = deliberate feature-kill of OTA"
+    shared_infrastructure: "lge.com zone"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "Blocking stops firmware/security updates — user's call (project precedent: OTA = keep-unless)"
+
+  - domain: su.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt"]
+    source_rank: B
+    status: active
+    purpose: OTA update server
+    confidence: medium
+    evidence: "G1 audit; STRICT feature-kill"
+    shared_infrastructure: "lge.com zone"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "firmware updates"
+
+  - domain: su-dev.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt"]
+    source_rank: B
+    status: active
+    purpose: OTA update server (dev channel)
+    confidence: medium
+    evidence: "G1 audit; STRICT feature-kill"
+    shared_infrastructure: "lge.com zone"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: su-ssl.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt"]
+    source_rank: B
+    status: active
+    purpose: OTA update server (SSL)
+    confidence: medium
+    evidence: "G1 audit; STRICT feature-kill"
+    shared_infrastructure: "lge.com zone"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: ngfts.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt", "perflyst:SmartTV.txt:103 (COMMENTED OUT — documented breakage)"]
+    source_rank: C
+    status: active
+    purpose: firmware/content file transfer
+    confidence: medium
+    evidence: "Perflyst inline comment: 'blocks thumbnails from loading in the LG Content Store'; furkan keeps it in STRICT as deliberate function-kill"
+    shared_infrastructure: "lge.com zone; cluster twins aic-ngfts/kic-ngfts/eic-ngfts"
+    wildcard: false
+    suggested_action: KEEP
+    notes: "Documented Content Store breakage in Perflyst; two-source agreement it kills store-adjacent function"
+
+  - domain: gfts.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt"]
+    source_rank: B
+    status: active
+    purpose: file transfer service
+    confidence: low
+    evidence: "G1 audit; function beyond 'file transfer' unproven"
+    shared_infrastructure: "lge.com zone; cluster twins exist"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "likely content/file delivery; unverified whether apps depend on it"
+
+  - domain: eic-ngfts.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt"]
+    source_rank: B
+    status: active
+    purpose: update-check / file-transfer telemetry (boot burst)
+    confidence: high
+    evidence: "traffic-verified on G1 (boot burst); STRICT because tied to update function"
+    shared_infrastructure: "eic cluster, lge.com zone"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "update-related — blocking may affect update checks"
+
+  - domain: eic-gfts.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt"]
+    source_rank: B
+    status: active
+    purpose: file-transfer telemetry
+    confidence: high
+    evidence: "traffic-verified on G1"
+    shared_infrastructure: "eic cluster, lge.com zone"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: ngfts.nextlgsdp.com
+    family: nextlgsdp.com
+    source: ["furkan:src/strict.txt", "perflyst:SmartTV.txt:126 (active)"]
+    source_rank: B
+    status: active
+    purpose: update transfer on SDP family
+    confidence: medium
+    evidence: "G1 audit; bare name; eic./aic./kic.-ngfts.nextlgsdp.com twins exist (cluster records below)"
+    shared_infrastructure: "nextlgsdp family — mixed telemetry/time/billing on some models"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "update function; exact name only (family unsafe)"
+
+  - domain: eic-ngfts.tv.wiselg.com
+    family: wiselg.com
+    source: ["furkan:src/strict.txt"]
+    source_rank: B
+    status: active
+    purpose: update transfer (wiselg family)
+    confidence: medium
+    evidence: "G1 audit; aic./kic. twins exist"
+    shared_infrastructure: "eic cluster, wiselg family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "update function"
+
+  - domain: lss.lgthinq.com
+    family: lgthinq.com
+    source: ["furkan:src/strict.txt"]
+    source_rank: B
+    status: active
+    purpose: ThinQ cloud sync backend
+    confidence: medium
+    evidence: "G1 audit; STRICT = deliberate kill of ThinQ (remote app / voice)"
+    shared_infrastructure: "lgthinq family is the Azure exception (all others AWS)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "kills ThinQ app/voice by design"
+
+  - domain: eic-op-lss.lgthinq.com
+    family: lgthinq.com
+    source: ["furkan:src/strict.txt"]
+    source_rank: B
+    status: active
+    purpose: ThinQ operations telemetry
+    confidence: medium
+    evidence: "G1 audit; aic-op-lss/kic-op-lss exist; lgthinq cluster entry points never complete a 443 handshake (PR #14)"
+    shared_infrastructure: "eic cluster, lgthinq (Azure)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "ThinQ cloud"
+
+  - domain: bss.lgechannel.com
+    family: lgechannel.com
+    source: ["furkan:src/strict.txt (decommissioned 2026-09-12)"]
+    source_rank: B
+    status: decommissioned
+    purpose: LG Channels (FAST) backend
+    confidence: medium
+    evidence: "G1 audit; NXDOMAIN 2026-09-12 — service gone"
+    shared_infrastructure: "lgechannel family (dead)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "was a deliberate feature-kill; now dead anyway"
+
+  - domain: lgechannel.com
+    family: lgechannel.com
+    source: ["furkan:src/strict.txt (decommissioned 2026-09-12)"]
+    source_rank: B
+    status: decommissioned
+    purpose: LG Channels (FAST) apex
+    confidence: medium
+    evidence: "G1 audit; NXDOMAIN 2026-09-12"
+    shared_infrastructure: "dead family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: lgtvonline.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt (weak)"]
+    source_rank: C
+    status: active
+    purpose: unknown — post-boot only
+    confidence: low
+    evidence: "observed on G1, function unproven ('weak')"
+    shared_infrastructure: "lge.com zone"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: am.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt (weak)"]
+    source_rank: C
+    status: active
+    purpose: unknown
+    confidence: low
+    evidence: "observed on G1, function unproven ('weak')"
+    shared_infrastructure: "lge.com zone"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: ig.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt (decommissioned 2026-09-12)"]
+    source_rank: C
+    status: decommissioned
+    purpose: unknown
+    confidence: low
+    evidence: "observed on G1; NXDOMAIN 2026-09-12"
+    shared_infrastructure: "lge.com zone"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: service.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (decommissioned 2026-09-12)"]
+    source_rank: B
+    status: decommissioned
+    purpose: common-services endpoint
+    confidence: low
+    evidence: "observed; NXDOMAIN 2026-09-12; moved to eic./aic./kic.service.lgtvcommon.com"
+    shared_infrastructure: "cluster twins are live"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: a.lgappstv.com
+    family: lgappstv.com
+    source: ["furkan:src/strict.txt (decommissioned 2026-09-12)"]
+    source_rank: C
+    status: decommissioned
+    purpose: store-CDN-adjacent (unproven)
+    confidence: low
+    evidence: "observed; NXDOMAIN 2026-09-12"
+    shared_infrastructure: "lgappstv store-CDN family — exact names only"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: lgappstv.com
+    family: lgappstv.com
+    source: ["furkan:src/strict.txt (weak)"]
+    source_rank: B
+    status: active
+    purpose: app-store CDN apex
+    confidence: low
+    evidence: "apex only (SOA) — blocking in exact-name formats hits the apex only; in adblock format the whole store CDN would die"
+    shared_infrastructure: "store CDN family: ibis. (ad vendor), us.ibs. (billing), lgshopsvc. (LG Shop)"
+    wildcard: false
+    suggested_action: KEEP
+    notes: "NEVER use as a wildcard/zone anchor — it is the app-store CDN apex"
+
+  - domain: fms.lgunifiedsmart.com
+    family: lgunifiedsmart.com
+    source: ["furkan:src/strict.txt (decommissioned 2026-09-12)"]
+    source_rank: C
+    status: decommissioned
+    purpose: smart-family messaging (unproven)
+    confidence: low
+    evidence: "observed; zone RETIRED 2026-09-12 — apex NXDOMAIN, whole zone gone"
+    shared_infrastructure: "dead zone"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: de.lgeapi.com
+    family: lgeapi.com
+    source: ["furkan:src/strict.txt (weak)"]
+    source_rank: C
+    status: active
+    purpose: region API — store/billing interplay unproven
+    confidence: low
+    evidence: "observed; region probes show <cc>.lgeapi.com live in 49/49 codes"
+    shared_infrastructure: "eic./aic./kic.lgeapi.com twins exist"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "possible billing path — verify before blocking on your model"
+
+  - domain: de.ibs.nextlgsdp.com
+    family: nextlgsdp.com
+    source: ["furkan:src/strict.txt (weak)"]
+    source_rank: C
+    status: active
+    purpose: possible in-app billing path (store risk)
+    confidence: low
+    evidence: "observed; furkan FAQ explicitly allowlists this host in its reference setup"
+    shared_infrastructure: "nextlgsdp family (billing/time mixed)"
+    wildcard: false
+    suggested_action: KEEP
+    notes: "billing — do not block"
+
+  - domain: eic-ocp.lgtviot.com
+    family: lgtviot.com
+    source: ["furkan:src/strict.txt (weak)"]
+    source_rank: C
+    status: active
+    purpose: unknown (DNS only)
+    confidence: low
+    evidence: "observed; aic-/kic-ocp exist; function unproven"
+    shared_infrastructure: "eic cluster, lgtviot family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: eic.cdplauncher.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (weak)"]
+    source_rank: C
+    status: active
+    purpose: content-launcher / CDP service
+    confidence: low
+    evidence: "observed; aic./kic. twins exist"
+    shared_infrastructure: "eic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "CDP = ad-delivery platform; content-launch interplay unverified"
+
+  - domain: eic.lgchhomeapp.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (weak)"]
+    source_rank: C
+    status: active
+    purpose: home-app service
+    confidence: low
+    evidence: "observed; aic./kic. twins exist"
+    shared_infrastructure: "eic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: rdx2.lgtvsdp.com
+    family: lgtvsdp.com
+    source: ["furkan:src/strict.txt (weak)"]
+    source_rank: C
+    status: active
+    purpose: unknown
+    confidence: low
+    evidence: "observed; function unproven. Perflyst blocks us./jp. rdx2 subdomains without issue evidence"
+    shared_infrastructure: "lgtvsdp family = time-sync family — this is not a <cc> host so likely not the time path, but unverified"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: "cross-source: Perflyst lists us.rdx2/jp.rdx2 as active blocks; no breakage report on file"
+
+  - domain: lggalleryplus.com
+    family: lggalleryplus.com
+    source: ["furkan:src/strict.txt (weak)", "Level1Techs #255178 (wendell, G5 recon 2026-08-24)"]
+    source_rank: C
+    status: active
+    purpose: Gallery+ / SDX endpoint (community-reported)
+    confidence: low
+    evidence: "not observed on the audited G1; community recon only; eic./aic./kic. twins exist"
+    shared_infrastructure: "eic/aic/kic cluster forms"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: lgsmartweb.com
+    family: lgsmartweb.com
+    source: ["furkan:src/strict.txt (weak, decommissioned 2026-09-12)", "Level1Techs #255178"]
+    source_rank: C
+    status: decommissioned
+    purpose: voice search backend — blocking it breaks remote voice search
+    confidence: medium
+    evidence: "community-reported function (voice search); NXDOMAIN 2026-09-12"
+    shared_infrastructure: "n/a (dead)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "was a KEEP-class function (voice search); now dead"
+
+  - domain: ueiwsp.com
+    family: ueiwsp.com
+    source: ["furkan:src/strict.txt (weak)", "furkan:issue #3 (rugk querylog, webOS 25 C5)"]
+    source_rank: C
+    status: active
+    purpose: interop — QuickSet Cloud (UEI) discovery API
+    confidence: medium
+    evidence: "user querylog (issue #3); cross-referenced hagezi #309 + hagezi native.lgwebos.txt; not observed on G1; breakage untested"
+    shared_infrastructure: "smart-home interop (QuickSet Cloud); www. form is the observed one"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "smart-home interop — user's call"
+
+  - domain: www.ueiwsp.com
+    family: ueiwsp.com
+    source: ["furkan:src/strict.txt", "furkan:issue #3"]
+    source_rank: B
+    status: active
+    purpose: interop — QuickSet Cloud (UEI) discovery API (observed host)
+    confidence: high
+    evidence: "observed on G1 2026-09-12: 11 queries / 48 min (AGH querylog via Fritz relay); breakage untested"
+    shared_infrastructure: "smart-home interop (QuickSet Cloud)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: lgshopsvc.lgappstv.com
+    family: lgappstv.com
+    source: ["furkan:src/strict.txt (weak)", "Level1Techs #255178 (wendell; observed live on G5)"]
+    source_rank: C
+    status: active
+    purpose: LG Shop service (SDX)
+    confidence: low
+    evidence: "community recon on G5; not observed on G1; eic./aic. twins exist, kic. absent (asymmetric)"
+    shared_infrastructure: "lgappstv store-CDN family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  # ======================= furkan STRICT — cluster section (53, all DNS-verified 2026-09-12) =======================
+  # All: evidence = DoH NOERROR (Google+Cloudflare, 18-prefix + zz/qq/xj controls) + TLS certs (62/65).
+  # Function INHERITED from the eic sibling (repo's own grade: "DNS existence, not traffic observation") => rank C for function.
+  # Repo policy: twins stay in STRICT (never promote to SAFE on a guess).
+
+  # ---- aic (22) ----
+  - domain: aic-gfts.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: file transfer service (Americas)
+    confidence: medium
+    evidence: "DNS-verified 2026-09-12; function inherited from eic/gfts sibling"
+    shared_infrastructure: "aic cluster, lge.com zone"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "update/file function — verify on an Americas TV before treating as pure telemetry"
+
+  - domain: aic-ngfts.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)", "perflyst:SmartTV.txt:113 (active, GN)"]
+    source_rank: C
+    status: active
+    purpose: firmware/content file transfer (Americas)
+    confidence: medium
+    evidence: "DNS-verified; independent GN-sourced listing in Perflyst"
+    shared_infrastructure: "aic cluster, lge.com zone"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "sibling of ngfts.lge.com which Perflyst documents as breaking Content Store thumbnails — treat update function as possibly essential"
+
+  - domain: aic-ngfts.nextlgsdp.com
+    family: nextlgsdp.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: update transfer on SDP family (Americas)
+    confidence: medium
+    evidence: "DNS-verified; function inherited"
+    shared_infrastructure: "aic cluster, nextlgsdp family (mixed)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: aic-ngfts.tv.wiselg.com
+    family: wiselg.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: update transfer (Americas)
+    confidence: medium
+    evidence: "DNS-verified; function inherited"
+    shared_infrastructure: "aic cluster, wiselg family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: aic-ocp.lgtviot.com
+    family: lgtviot.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: unknown (DNS only)
+    confidence: low
+    evidence: "DNS-verified; function unproven"
+    shared_infrastructure: "aic cluster, lgtviot family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: aic-op-lss.lgthinq.com
+    family: lgthinq.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: ThinQ operations telemetry (Americas)
+    confidence: medium
+    evidence: "DNS-verified; lgthinq cluster names resolve to Azure and never complete a 443 handshake (PR #14)"
+    shared_infrastructure: "aic cluster, lgthinq (Azure exception)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "ThinQ cloud"
+
+  - domain: aic.ads.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: ad delivery (Americas) — successor of dead bare ads.
+    confidence: medium
+    evidence: "DNS-verified; bare ads.lgtvcommon.com was G1-observed before moving here (NXDOMAIN 2026-09-12)"
+    shared_infrastructure: "aic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "ad delivery; twin itself DNS-only (no Americas traffic capture yet)"
+
+  - domain: aic.api.lgtviot.com
+    family: lgtviot.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: IoT telemetry API (Americas)
+    confidence: medium
+    evidence: "DNS-verified; eic.api sibling is SAFE-verified (5.1k queries)"
+    shared_infrastructure: "aic cluster, lgtviot family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "per-source policy: strict-tier until an Americas capture exists"
+
+  - domain: aic.cdpbeacon.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)", "perflyst:SmartTV.txt:124 (active, GN)"]
+    source_rank: C
+    status: active
+    purpose: ACR beacon / telemetry (Americas) — successor of the G1-observed 6-min beacon
+    confidence: medium
+    evidence: "DNS-verified; bare cdpbeacon. was 6-min-cadence observed on G1 then went NXDOMAIN (service moved); independent GN-sourced listing in Perflyst"
+    shared_infrastructure: "aic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "successor of a proven ACR beacon; twin itself DNS-only"
+
+  - domain: aic.cdplauncher.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: content-launcher / CDP service (Americas)
+    confidence: low
+    evidence: "DNS-verified; function inherited (weak)"
+    shared_infrastructure: "aic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: aic.homeprv.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: home-screen provisioning/promos (Americas)
+    confidence: medium
+    evidence: "DNS-verified; bare name was G1-observed before moving"
+    shared_infrastructure: "aic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: aic.lgchhomeapp.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: home-app service (Americas)
+    confidence: low
+    evidence: "DNS-verified; function inherited (weak)"
+    shared_infrastructure: "aic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: aic.lgeapi.com
+    family: lgeapi.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: region API (Americas) — store/billing interplay unproven
+    confidence: low
+    evidence: "DNS-verified; family live in 49/49 country probes"
+    shared_infrastructure: "aic cluster, lgeapi family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "possible billing path"
+
+  - domain: aic.lggalleryplus.com
+    family: lggalleryplus.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: Gallery+ / SDX endpoint (Americas)
+    confidence: low
+    evidence: "DNS-verified; community-reported stem (Level1Techs)"
+    shared_infrastructure: "aic cluster"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: aic.lgshopsvc.lgappstv.com
+    family: lgappstv.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: LG Shop service (Americas)
+    confidence: low
+    evidence: "DNS-verified; community-reported; kic. twin absent (asymmetric stem)"
+    shared_infrastructure: "aic cluster, lgappstv store family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: aic.lgthinq.com
+    family: lgthinq.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: ThinQ cloud entry point (Americas)
+    confidence: medium
+    evidence: "DNS-verified; resolves to Azure, no 443 handshake (PR #14)"
+    shared_infrastructure: "aic cluster, lgthinq (Azure)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "ThinQ = remote app / voice"
+
+  - domain: aic.lgtviot.com
+    family: lgtviot.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: IoT telemetry (Americas)
+    confidence: medium
+    evidence: "DNS-verified; eic sibling is the largest observed family (~5.1k queries)"
+    shared_infrastructure: "aic cluster, lgtviot family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "strict-tier per source policy until Americas capture"
+
+  - domain: aic.nudge.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: nudge/notification telemetry (Americas)
+    confidence: medium
+    evidence: "DNS-verified; eic sibling SAFE-verified"
+    shared_infrastructure: "aic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: aic.recommend.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: recommendations/promos (Americas)
+    confidence: medium
+    evidence: "DNS-verified; bare name was G1-observed before moving"
+    shared_infrastructure: "aic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: aic.service.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: common-services endpoint (Americas)
+    confidence: low
+    evidence: "DNS-verified; bare name was G1-observed (weak) before moving"
+    shared_infrastructure: "aic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: aic.tv.wiselg.com
+    family: wiselg.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: TV telemetry (Americas)
+    confidence: medium
+    evidence: "DNS-verified; eic sibling SAFE-verified (blocked live, apps fine)"
+    shared_infrastructure: "aic cluster, wiselg family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: aic.wiseconfig.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: cloud-config telemetry (Americas)
+    confidence: medium
+    evidence: "DNS-verified; eic sibling SAFE-verified"
+    shared_infrastructure: "aic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  # ---- eic (10, excluding eic-ngfts.lge.com / eic-gfts.lge.com which are in the non-cluster section) ----
+  - domain: eic-ngfts.nextlgsdp.com
+    family: nextlgsdp.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: update transfer on SDP family (Europe)
+    confidence: medium
+    evidence: "DNS-verified; function inherited"
+    shared_infrastructure: "eic cluster, nextlgsdp family (mixed)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: eic.ads.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: ad delivery (Europe) — successor of dead bare ads.
+    confidence: medium
+    evidence: "DNS-verified; bare name was G1-observed before moving (NXDOMAIN 2026-09-12)"
+    shared_infrastructure: "eic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: eic.cdpbeacon.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: ACR beacon / telemetry (Europe) — successor of the G1-observed 6-min beacon
+    confidence: medium
+    evidence: "DNS-verified; bare cdpbeacon. 6-min-cadence observed on G1 then NXDOMAIN (moved here)"
+    shared_infrastructure: "eic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "the G1's own ACR beacon moved to this name"
+
+  - domain: eic.homeprv.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: home-screen provisioning/promos (Europe)
+    confidence: medium
+    evidence: "DNS-verified; bare name was G1-observed before moving"
+    shared_infrastructure: "eic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: eic.lgeapi.com
+    family: lgeapi.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: region API (Europe)
+    confidence: low
+    evidence: "DNS-verified; family live in 49/49 country probes; store/billing interplay unproven"
+    shared_infrastructure: "eic cluster, lgeapi family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "possible billing path"
+
+  - domain: eic.lggalleryplus.com
+    family: lggalleryplus.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: Gallery+ / SDX endpoint (Europe)
+    confidence: low
+    evidence: "DNS-verified; community-reported stem"
+    shared_infrastructure: "eic cluster"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: eic.lgshopsvc.lgappstv.com
+    family: lgappstv.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: LG Shop service (Europe)
+    confidence: low
+    evidence: "DNS-verified; community-reported"
+    shared_infrastructure: "eic cluster, lgappstv store family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: eic.lgthinq.com
+    family: lgthinq.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: ThinQ cloud entry point (Europe)
+    confidence: medium
+    evidence: "DNS-verified; Azure, no 443 handshake (PR #14)"
+    shared_infrastructure: "eic cluster, lgthinq (Azure)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "ThinQ = remote app / voice"
+
+  - domain: eic.recommend.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: recommendations/promos (Europe)
+    confidence: medium
+    evidence: "DNS-verified; bare name was G1-observed before moving"
+    shared_infrastructure: "eic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: eic.service.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: common-services endpoint (Europe)
+    confidence: low
+    evidence: "DNS-verified; bare name was G1-observed (weak) before moving"
+    shared_infrastructure: "eic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  # ---- kic (21) ----
+  - domain: kic-gfts.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: file transfer service (Korea)
+    confidence: medium
+    evidence: "DNS-verified; function inherited"
+    shared_infrastructure: "kic cluster, lge.com zone"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: kic-ngfts.lge.com
+    family: lge.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: firmware/content file transfer (Korea)
+    confidence: medium
+    evidence: "DNS-verified; function inherited from gfts/ngfts siblings"
+    shared_infrastructure: "kic cluster, lge.com zone"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "sibling ngfts.lge.com is documented (Perflyst) to break Content Store thumbnails"
+
+  - domain: kic-ngfts.nextlgsdp.com
+    family: nextlgsdp.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: update transfer on SDP family (Korea)
+    confidence: medium
+    evidence: "DNS-verified; function inherited"
+    shared_infrastructure: "kic cluster, nextlgsdp family (mixed)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: kic-ngfts.tv.wiselg.com
+    family: wiselg.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: update transfer (Korea)
+    confidence: medium
+    evidence: "DNS-verified; function inherited"
+    shared_infrastructure: "kic cluster, wiselg family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: kic-ocp.lgtviot.com
+    family: lgtviot.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: unknown (DNS only)
+    confidence: low
+    evidence: "DNS-verified; function unproven"
+    shared_infrastructure: "kic cluster, lgtviot family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: kic-op-lss.lgthinq.com
+    family: lgthinq.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: ThinQ operations telemetry (Korea)
+    confidence: medium
+    evidence: "DNS-verified; Azure, no 443 handshake (PR #14)"
+    shared_infrastructure: "kic cluster, lgthinq (Azure)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: kic.ads.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: ad delivery (Korea)
+    confidence: medium
+    evidence: "DNS-verified; successor of dead bare ads. (G1-observed before move)"
+    shared_infrastructure: "kic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: kic.api.lgtviot.com
+    family: lgtviot.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: IoT telemetry API (Korea)
+    confidence: medium
+    evidence: "DNS-verified; eic.api sibling SAFE-verified"
+    shared_infrastructure: "kic cluster, lgtviot family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: kic.cdpbeacon.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: ACR beacon / telemetry (Korea)
+    confidence: medium
+    evidence: "DNS-verified; successor of G1-observed 6-min beacon"
+    shared_infrastructure: "kic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: kic.cdplauncher.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: content-launcher / CDP service (Korea)
+    confidence: low
+    evidence: "DNS-verified; function inherited (weak)"
+    shared_infrastructure: "kic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: kic.homeprv.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: home-screen provisioning/promos (Korea)
+    confidence: medium
+    evidence: "DNS-verified; successor of G1-observed bare name"
+    shared_infrastructure: "kic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: kic.lgchhomeapp.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: home-app service (Korea)
+    confidence: low
+    evidence: "DNS-verified; function inherited (weak)"
+    shared_infrastructure: "kic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: kic.lgeapi.com
+    family: lgeapi.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: region API (Korea)
+    confidence: low
+    evidence: "DNS-verified; store/billing interplay unproven"
+    shared_infrastructure: "kic cluster, lgeapi family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: kic.lggalleryplus.com
+    family: lggalleryplus.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: Gallery+ / SDX endpoint (Korea)
+    confidence: low
+    evidence: "DNS-verified; community-reported stem"
+    shared_infrastructure: "kic cluster"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: kic.lgthinq.com
+    family: lgthinq.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: ThinQ cloud entry point (Korea)
+    confidence: medium
+    evidence: "DNS-verified; Azure, no 443 handshake (PR #14)"
+    shared_infrastructure: "kic cluster, lgthinq (Azure)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: kic.lgtviot.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: IoT telemetry (Korea)
+    confidence: medium
+    evidence: "DNS-verified; eic sibling is largest observed family"
+    shared_infrastructure: "kic cluster, lgtviot family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: kic.nudge.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: nudge/notification telemetry (Korea)
+    confidence: medium
+    evidence: "DNS-verified; eic sibling SAFE-verified"
+    shared_infrastructure: "kic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: kic.recommend.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: recommendations/promos (Korea)
+    confidence: medium
+    evidence: "DNS-verified; successor of G1-observed bare name"
+    shared_infrastructure: "kic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: kic.service.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: common-services endpoint (Korea)
+    confidence: low
+    evidence: "DNS-verified; successor of G1-observed (weak) bare name"
+    shared_infrastructure: "kic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: kic.tv.wiselg.com
+    family: wiselg.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: TV telemetry (Korea)
+    confidence: medium
+    evidence: "DNS-verified; eic sibling SAFE-verified"
+    shared_infrastructure: "kic cluster, wiselg family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: kic.wiseconfig.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/strict.txt (cluster, PR #7)"]
+    source_rank: C
+    status: active
+    purpose: cloud-config telemetry (Korea)
+    confidence: medium
+    evidence: "DNS-verified; eic sibling SAFE-verified"
+    shared_infrastructure: "kic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  # ======================= furkan STRICT — interop (1) =======================
+
+  - domain: discovery.meethue.com
+    family: meethue.com
+    source: ["furkan:src/strict.txt (interop)", "furkan:issue #12 (rugk, webOS 25 C5)"]
+    source_rank: B
+    status: active
+    purpose: Philips Hue cloud bridge discovery (N-UPnP) — smart-home interop, NOT LG telemetry
+    confidence: high
+    evidence: "user querylog (issue #12) + G1 pcap frame 25919 (TLS SNI to 34.117.13.189:443) + AGH querylog ~4,100 lookups at ~5-min cadence 2026-06-11..2026-09-14; cloud discovery only — local mDNS unaffected; breakage untested (no Hue bridge available)"
+    shared_infrastructure: "Philips Hue cloud (shared with Hue ecosystem)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "interop — user's call; blocking only kills cloud-based Hue discovery"
+
+  # ======================= furkan ZONES (9 STRICT-only zone anchors) =======================
+
+  - domain: lge.com
+    family: lge.com
+    source: ["furkan:src/zones.txt"]
+    source_rank: B
+    status: active
+    purpose: umbrella zone anchor (STRICT only)
+    confidence: high
+    evidence: "in -adblock.txt becomes ||lge.com^ — kills EVERY lge.com subdomain including OTA su*/snu and (documented-broken) ngfts"
+    shared_infrastructure: "whole lge.com zone"
+    wildcard: true
+    suggested_action: KEEP
+    notes: "DO NOT USE as a wildcard — it kills firmware OTA and Content Store file transfer (both documented functions). In exact-name formats the apex row is harmless (SOA only)"
+
+  - domain: lgeapi.com
+    family: lgeapi.com
+    source: ["furkan:src/zones.txt"]
+    source_rank: C
+    status: active
+    purpose: region API umbrella
+    confidence: low
+    evidence: "zone live in 49/49 country probes; individual functions (incl. possible billing) unproven"
+    shared_infrastructure: "eic/aic/kic cluster forms + <cc> forms"
+    wildcard: true
+    suggested_action: OPTIONAL
+    notes: "zone contains possible billing paths — exact names only recommended"
+
+  - domain: wiselg.com
+    family: wiselg.com
+    source: ["furkan:src/zones.txt"]
+    source_rank: B
+    status: active
+    purpose: TV / wiselg telemetry umbrella
+    confidence: medium
+    evidence: "zone contains SAFE-verified telemetry (eic.tv.wiselg.com) BUT also update-transfer hosts (eic/aic/kic-ngfts.tv.wiselg.com)"
+    shared_infrastructure: "wiselg family + eic/aic/kic cluster"
+    wildcard: true
+    suggested_action: OPTIONAL
+    notes: "zone mixes telemetry with update transfer — exact names recommended"
+
+  - domain: lgthinq.com
+    family: lgthinq.com
+    source: ["furkan:src/zones.txt"]
+    source_rank: B
+    status: active
+    purpose: ThinQ cloud umbrella
+    confidence: medium
+    evidence: "deliberate feature-kill (ThinQ remote app / voice); whole family on Azure (unlike all other LG families); entry-point names fail 443 handshake (PR #14)"
+    shared_infrastructure: "ThinQ cloud (Azure)"
+    wildcard: true
+    suggested_action: OPTIONAL
+    notes: "user's call: full ThinQ kill vs keep remote app/voice"
+
+  - domain: lgtviot.com
+    family: lgtviot.com
+    source: ["furkan:src/zones.txt"]
+    source_rank: B
+    status: active
+    purpose: IoT telemetry umbrella
+    confidence: high
+    evidence: "known functions are telemetry (eic + api SAFE-verified, ~5.1k queries); only eic-ocp/aic-ocp/kic-ocp are unproven"
+    shared_infrastructure: "lgtviot family + cluster forms"
+    wildcard: true
+    suggested_action: BLOCK
+    notes: "zone is telemetry except 3 unknown '-ocp' hosts; acceptable per source STRICT policy"
+
+  - domain: nextlgsdp.com
+    family: nextlgsdp.com
+    source: ["furkan:src/zones.txt"]
+    source_rank: B
+    status: active
+    purpose: SDP umbrella
+    confidence: high
+    evidence: "FAMILY-UNSAFE wildcard: two-letter <cc>.nextlgsdp.com hosts carry TV time-sync (hagezi/dns-blocklists#11438; furkan issue #6) and in-app billing (de.ibs., allowlisted in furkan FAQ) on some models"
+    shared_infrastructure: "SDP family: telemetry + time + billing mixed"
+    wildcard: true
+    suggested_action: KEEP
+    notes: "NEVER block this zone as a wildcard. Exact telemetry hosts only (de./ca. verified; all others model-dependent)"
+
+  - domain: lgunifiedsmart.com
+    family: lgunifiedsmart.com
+    source: ["furkan:src/zones.txt (ZONE RETIRED 2026-09-12)"]
+    source_rank: B
+    status: decommissioned
+    purpose: zone anchor — apex NXDOMAIN, whole zone gone (incl. fms.)
+    confidence: high
+    evidence: "NXDOMAIN 2026-09-12; kept in zones.txt in case LG revives the zone"
+    shared_infrastructure: "dead zone"
+    wildcard: true
+    suggested_action: BLOCK
+    notes: "blocking is harmless (nothing resolves); no function lost"
+
+  - domain: lgsmartplatform.com
+    family: lgsmartplatform.com
+    source: ["furkan:src/zones.txt"]
+    source_rank: B
+    status: active
+    purpose: smart-platform telemetry umbrella
+    confidence: medium
+    evidence: "de.emp. observed (SAFE); CNAMEs prove eic/aic split; regional siblings otherwise uncovered"
+    shared_infrastructure: "lgemp-prd.net AWS backends (eu-west-1 / us-west-2)"
+    wildcard: true
+    suggested_action: BLOCK
+    notes: "telemetry family; no documented essential function inside it"
+
+  - domain: lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["furkan:src/zones.txt", "perflyst:issue #148 (CONFLICT)"]
+    source_rank: B
+    status: active
+    purpose: common-services telemetry umbrella (ACR/ads/promos/CDP)
+    confidence: medium
+    evidence: "G1: whole zone live-blocked since 2026-09-09 with no breakage; wildcard-safe per Level1Techs #255178. CONFLICT: Perflyst #148 — a lgtvcommon.com^ wildcard row broke the LG Channels app (error -102) on another setup; commenting it out fixed Pluto"
+    shared_infrastructure: "largest LG telemetry family; contains cluster twins + (dead) bare names"
+    wildcard: true
+    suggested_action: BLOCK
+    notes: "model-dependent conflict on file. If you run LG Channels (FAST) or Xumo on your model, prefer exact names over the zone anchor"
+
+  # ======================= Perflyst-only entries =======================
+
+  - domain: ibis.lgappstv.com
+    family: lgappstv.com
+    source: ["perflyst:SmartTV.txt:98"]
+    source_rank: C
+    status: active
+    purpose: Ibis Media — LG's ad/ACR vendor
+    confidence: medium
+    evidence: "community list (2018-2023 era); not independently probed; store CDN family (exact names only)"
+    shared_infrastructure: "lgappstv store-CDN family; Ibis ad platform"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "ad/ACR vendor endpoint"
+
+  - domain: jp.rdx2.lgtvsdp.com
+    family: lgtvsdp.com
+    source: ["perflyst:SmartTV.txt:99"]
+    source_rank: D
+    status: active
+    purpose: unknown / possible ad delivery (JP)
+    confidence: low
+    evidence: "no issue on file; lgtvsdp family caveat (time-sync family — though rdx2 is not a <cc> host)"
+    shared_infrastructure: "lgtvsdp family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: "cross-check: furkan lists bare rdx2.lgtvsdp.com (weak/unknown) — consistent unknown"
+
+  - domain: jp.lgtvsdp.com
+    family: lgtvsdp.com
+    source: ["perflyst:SmartTV.txt:100"]
+    source_rank: C
+    status: active
+    purpose: JP regional SDP host — TIME-SYNC FAMILY
+    confidence: medium
+    evidence: "lgtvsdp family = LG's SDP time channel (furkan issue #6 + 3ea0f34; Perflyst #117/#121/#53 document the same family for US/GB). Perflyst comments out us. but actively blocks jp. — internally inconsistent"
+    shared_infrastructure: "lgtvsdp time-sync family"
+    wildcard: false
+    suggested_action: KEEP
+    notes: "flagged: a <cc>.lgtvsdp.com host inside the time-sync family; blocking it risks the same clock-reset cascade documented in #117 for JP models"
+
+  - domain: lgad.cjpowercast.com.edgesuite.net
+    family: cjpowercast.com
+    source: ["perflyst:SmartTV.txt:102", "perflyst:issue #134"]
+    source_rank: D
+    status: active
+    purpose: ad delivery (CJ PowerCast US ad network) — entry MALFORMED
+    confidence: low
+    evidence: "issue #134: should be lgad.cjpowercast.com + edgesuite.net (two separate domains). As written the concatenated name likely matches nothing"
+    shared_infrastructure: "CJ PowerCast / Akamai (shared ad infra)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "fix to lgad.cjpowercast.com if you keep the entry; edgesuite.net is an Akamai CDN zone — never block the whole thing"
+
+  - domain: smartclip.com
+    family: smartclip.net
+    source: ["perflyst:SmartTV.txt:104"]
+    source_rank: C
+    status: active
+    purpose: HBBTV ad network — SHARED infrastructure (not LG-specific)
+    confidence: medium
+    evidence: "HBBTV section of the same list blocks *.smartclip.net subdomains; ad network used by multiple TV vendors"
+    shared_infrastructure: "HBBTV ecosystem (shared)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "shared ad infra"
+
+  - domain: smartclip.net
+    family: smartclip.net
+    source: ["perflyst:SmartTV.txt:105"]
+    source_rank: C
+    status: active
+    purpose: HBBTV ad network — SHARED infrastructure
+    confidence: medium
+    evidence: "same as above; HBBTV section adds cdn./scheduler./stats.hbbtv.smartclip.net"
+    shared_infrastructure: "HBBTV ecosystem (shared)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: smartshare.lgtvsdp.com
+    family: lgtvsdp.com
+    source: ["perflyst:SmartTV.txt:106"]
+    source_rank: D
+    status: active
+    purpose: name suggests LG SmartShare service on the SDP family; unproven
+    confidence: low
+    evidence: "no issue on file; lgtvsdp family caveat"
+    shared_infrastructure: "lgtvsdp family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: "if it is the SmartShare (screen-share) function, blocking would kill it — unverified"
+
+  - domain: us.ad.lgsmartad.com
+    family: lgsmartad.com
+    source: ["perflyst:SmartTV.txt:107"]
+    source_rank: B
+    status: active
+    purpose: ad delivery (US)
+    confidence: high
+    evidence: "lgsmartad family = dedicated ad zone (furkan: whole family is ads; region probes 49/49)"
+    shared_infrastructure: "LG ad family only"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: us.ibs.lgappstv.com
+    family: lgappstv.com
+    source: ["perflyst:SmartTV.txt:108"]
+    source_rank: C
+    status: active
+    purpose: IBS = in-app billing on the store-CDN family (US)
+    confidence: medium
+    evidence: "no breakage issue on file, but the name/family indicates billing — same class as de.ibs.nextlgsdp.com which furkan explicitly allowlists"
+    shared_infrastructure: "lgappstv store-CDN family"
+    wildcard: false
+    suggested_action: KEEP
+    notes: "billing path — active blocking in Perflyst with no reported breakage is an unverified risk, not a proven win"
+
+  - domain: us.info.lgsmartad.com
+    family: lgsmartad.com
+    source: ["perflyst:SmartTV.txt:109"]
+    source_rank: B
+    status: active
+    purpose: ad-info endpoint (US)
+    confidence: high
+    evidence: "dedicated ad zone (furkan)"
+    shared_infrastructure: "LG ad family only"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: us.rdx2.lgtvsdp.com
+    family: lgtvsdp.com
+    source: ["perflyst:SmartTV.txt:111"]
+    source_rank: D
+    status: active
+    purpose: unknown / possible ad delivery (US)
+    confidence: low
+    evidence: "no issue on file; not a <cc> host so likely outside the time path, unverified"
+    shared_infrastructure: "lgtvsdp family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: yumenetworks.com
+    family: yumenetworks.com
+    source: ["perflyst:SmartTV.txt:112"]
+    source_rank: C
+    status: active
+    purpose: ad network — SHARED infrastructure (general ad tech, not LG-specific)
+    confidence: medium
+    evidence: "ad network used across TV/app ecosystems"
+    shared_infrastructure: "shared ad tech"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "shared"
+
+  - domain: us.cdpbeacon.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["perflyst:SmartTV.txt:114"]
+    source_rank: D
+    status: active
+    purpose: ACR beacon (US prefix form)
+    confidence: low
+    evidence: "existence of the `us.` prefix form NEVER verified by either source — furkan's enumeration found the live names as eic./aic./kic.cdpbeacon.lgtvcommon.com (bare name NXDOMAIN 2026-09-12)"
+    shared_infrastructure: "lgtvcommon ACR; live twins are the cluster names"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "likely a legacy alias matching nothing; the live successors are separate records (eic/aic/kic.cdpbeacon)"
+
+  - domain: us.cdpsvc.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["perflyst:SmartTV.txt:115"]
+    source_rank: D
+    status: active
+    purpose: CDP service (US prefix form) — unknown
+    confidence: low
+    evidence: "us. form never verified; stem cdpsvc appears only in Perflyst (furkan's set has cdplauncher.)"
+    shared_infrastructure: "lgtvcommon family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: us.homeprv.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["perflyst:SmartTV.txt:116"]
+    source_rank: D
+    status: active
+    purpose: home-screen provisioning/promos (US prefix form)
+    confidence: low
+    evidence: "us. form never verified; live twins are eic/aic/kic.homeprv (DNS-verified)"
+    shared_infrastructure: "lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "probably harmless (likely dead alias); real coverage comes from the cluster records"
+
+  - domain: us.nudge.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["perflyst:SmartTV.txt:117"]
+    source_rank: D
+    status: active
+    purpose: nudge/notification telemetry (US prefix form)
+    confidence: low
+    evidence: "us. form never verified; eic.nudge is SAFE-verified telemetry; live twins are cluster names"
+    shared_infrastructure: "lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: us.rdl.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["perflyst:SmartTV.txt:118"]
+    source_rank: D
+    status: active
+    purpose: unknown (rdl stem appears only in Perflyst)
+    confidence: low
+    evidence: "never verified by either source"
+    shared_infrastructure: "lgtvcommon family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: us.recommend.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["perflyst:SmartTV.txt:119"]
+    source_rank: D
+    status: active
+    purpose: recommendations/promos (US prefix form)
+    confidence: low
+    evidence: "us. form never verified; live twins are eic/aic/kic.recommend"
+    shared_infrastructure: "lgtvcommon family"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: ""
+
+  - domain: us.lgsmartad.com
+    family: lgsmartad.com
+    source: ["perflyst:SmartTV.txt:120"]
+    source_rank: B
+    status: active
+    purpose: ad-zone apex (US)
+    confidence: high
+    evidence: "dedicated ad zone (furkan: whole family is ads)"
+    shared_infrastructure: "LG ad family only"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "apex of an ad-only family — safe in any format"
+
+  - domain: us.service.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["perflyst:SmartTV.txt:121"]
+    source_rank: D
+    status: active
+    purpose: common-services endpoint (US prefix form)
+    confidence: low
+    evidence: "us. form never verified; live twins are eic/aic/kic.service"
+    shared_infrastructure: "lgtvcommon family"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: ""
+
+  - domain: aic.cdpsvc.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["perflyst:SmartTV.txt:123 (GN, PR #168)"]
+    source_rank: C
+    status: active
+    purpose: CDP service (Americas)
+    confidence: low
+    evidence: "GN-sourced addition; stem cdpsvc absent from furkan's independently-probed 53-entry cluster set (which has cdplauncher.) — existence unverified by the B-rank source"
+    shared_infrastructure: "aic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: "possible additional live stem — worth a DoH probe"
+
+  - domain: us.nextlgsdp.com
+    family: nextlgsdp.com
+    source: ["perflyst:SmartTV.txt:125 (GN, PR #168)"]
+    source_rank: C
+    status: active
+    purpose: US SDP endpoint (telemetry/ad per GN)
+    confidence: low
+    evidence: "GN-sourced; live per PR #169 script; BUT nextlgsdp family carries time-sync + billing on some models (hagezi#11438, furkan FAQ) — US-model behaviour unverified"
+    shared_infrastructure: "nextlgsdp family (mixed)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "exact host only; family-unsafe for patterns"
+
+  - domain: aic.rdl.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["perflyst:SmartTV.txt:127 (GN, PR #168)"]
+    source_rank: C
+    status: active
+    purpose: unknown (rdl stem, Americas)
+    confidence: low
+    evidence: "GN-sourced; stem absent from furkan's probed cluster set"
+    shared_infrastructure: "aic cluster, lgtvcommon family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""
+
+  - domain: aic-gfts.nextlgsdp.com
+    family: nextlgsdp.com
+    source: ["perflyst:SmartTV.txt:128 (GN, PR #168)"]
+    source_rank: C
+    status: active
+    purpose: file-transfer (Americas, SDP family)
+    confidence: low
+    evidence: "GN-sourced addition; NOT in furkan's independently-probed 53-entry cluster set (which has aic-gfts.lge.com and aic-ngfts.nextlgsdp.com, but not this name) — existence unverified by the B-rank source"
+    shared_infrastructure: "aic cluster, nextlgsdp family (mixed)"
+    wildcard: false
+    suggested_action: OPTIONAL
+    notes: "update/file function"
+
+  # --- the 246-host enumerated block (PR #169) as ONE pattern record -----------------------
+
+  - domain: <cc>.nextlgsdp.com
+    family: nextlgsdp.com
+    source: ["perflyst:SmartTV.txt:130-375 (PR #169, 2026-09-09)", "furkan:src/safe.txt (de./ca. individual)", "hagezi/dns-blocklists#11438 (CONFLICT)"]
+    source_rank: C
+    status: active
+    purpose: regional SDP endpoints — telemetry/ad per GN; LIVE-VERIFIED existence (dnspython+iso3166 script in PR #169)
+    confidence: medium
+    evidence: "246 enumerated exact hosts (NOT a wildcard row): all ISO 3166-1 alpha-2 codes except ax/bl/tl, plus non-standard xk and retired cc. Existence = B-grade (script-verified). SAFETY = contradicted: hagezi#11438 documents time-sync breakage when the nextlgsdp family is blocked on some models; furkan refused to generalise its own region pattern and allowlists de.ibs.nextlgsdp.com (billing) — yet Perflyst blocks de.ibs..."
+    shared_infrastructure: "SDP family: telemetry + TV time-sync + in-app billing mixed in one family"
+    wildcard: true
+    suggested_action: OPTIONAL
+    notes: "wildcard flag: the FILE enumerates exact hosts (safe form), but any consumer that collapses them to a regex/wildcard (e.g. perflyst's companion regex.list or a Pi-hole regex) recreates the documented time-sync breakage. Per-cc decision: block cc hosts verified as telemetry on YOUR model; never blanket the family"
+
+  - domain: alphonso.tv
+    family: alphonso.tv
+    source: ["perflyst:SmartTV.txt:557 ('Other useless connections' section)", "perflyst:issue #139"]
+    source_rank: C
+    status: active
+    purpose: LG's ACR + ad vendor (replaced Gracenote ACR / Unruly ads Jan 2022, US/CA)
+    confidence: medium
+    evidence: "issue #139 documents the vendor switch and recommends this entry; absent from the furkan list (noted gap)"
+    shared_infrastructure: "Alphonso ad/ACR platform (LG-specific usage)"
+    wildcard: false
+    suggested_action: BLOCK
+    notes: "ACR = viewing-reporting vendor; high privacy value"
+
+  - domain: us.lgtvsdp.com
+    family: lgtvsdp.com
+    source: ["perflyst:SmartTV.txt:110 (COMMENTED OUT)", "perflyst:issue #117 (Dec 2021)", "perflyst:issue #121 (Dec 2021, open)"]
+    source_rank: C
+    status: commented-out
+    purpose: TV time-sync host (US) — DUAL-USE (time + ad/config payloads per #121)
+    confidence: high
+    evidence: "#117: blocking breaks Auto Date & Time on cold boot → clock resets to 2019-12-31 → Plex 'network unreachable', HBO Max cert errors, YouTube stuck on boot animation. TV queries it twice ~30-45s apart on first boot. #121: unblocking brings home-screen ads back → dual-use confirmed. List keeps it commented out: time wins, ads leak"
+    shared_infrastructure: "lgtvsdp time-sync family (systemTimeSource=sdp — LG SDP handshake, not NTP)"
+    wildcard: false
+    suggested_action: KEEP
+    notes: "canonical LG breakage report; do not block"
+
+  # --- proposed (not yet in the live file) ---------------------------------------------------
+
+  - domain: lgtvsdp.com
+    family: lgtvsdp.com
+    source: ["perflyst:PR #170 (OPEN, furkan-bayrak, 2026-09-11)"]
+    source_rank: C
+    status: proposed
+    purpose: bare apex of the time-sync family — ⚠️ should NOT be merged
+    confidence: high
+    evidence: "PR #170's 9-line diff (verified) includes a bare lgtvsdp.com row. The PR predates furkan's own 2026-09-16 discovery that the lgtvsdp family is the TV's time channel and its removal of the bare apex from its safe list (commit 3ea0f34 + FORBIDDEN_APEX_ENTRIES build guard). Merging #170 as-is reintroduces the documented #117 time-sync breakage for adblock-format consumers. The PR has not been updated"
+    shared_infrastructure: "lgtvsdp time-sync family"
+    wildcard: false
+    suggested_action: KEEP
+    notes: "CRITICAL flag for anyone tracking upstream: object to / edit this PR before merge"
+
+  - domain: rdth.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["perflyst:PR #171 (OPEN, 2026-09)"]
+    source_rank: D
+    status: proposed
+    purpose: "Remote Diagnostics & Telemetry Handler (webOS 22 / C-series, per author)"
+    confidence: low
+    evidence: "author claims zero impact on store/streaming — unverified; no third-party confirmation"
+    shared_infrastructure: "lgtvcommon family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: "us.rdth.lgtvcommon.com in the same PR — same assessment"
+
+  - domain: us.rdth.lgtvcommon.com
+    family: lgtvcommon.com
+    source: ["perflyst:PR #171 (OPEN, 2026-09)"]
+    source_rank: D
+    status: proposed
+    purpose: as above (US form)
+    confidence: low
+    evidence: "unverified author claim"
+    shared_infrastructure: "lgtvcommon family"
+    wildcard: false
+    suggested_action: UNKNOWN
+    notes: ""

@@ -1,0 +1,584 @@
+# LG webOS tracking / telemetry / functional-infrastructure inventory
+# Generated: 2026-09-22. Sources fetched 2026-09-21/22 (see `source` per entry).
+#
+# source_rank:  A = peer-reviewed | B = maintained tracker list with stated methodology
+#               C = community source with real observations (captures/reverse engineering)
+#               D = anecdotal / unverified
+# suggested_action: BLOCK | KEEP | OPTIONAL | UNKNOWN
+#   BLOCK    = block at DNS (ad/tracking, low breakage risk)
+#   KEEP     = must remain reachable (breakage or security risk if blocked)
+#   OPTIONAL = user choice; real functional or security trade-off
+#   UNKNOWN  = purpose unestablished; no action
+#
+# Wildcards: flagged in `notes` with justification. Prefer exact hostnames otherwise.
+#
+# Key URLs:
+#   HAGEZI_RAW   = https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/native.lgwebos.txt
+#   HAGEZI_DISC  = https://github.com/hagezi/dns-blocklists/discussions/8697
+#   ISS_11438    = https://github.com/hagezi/dns-blocklists/issues/11438
+#   ISS_11474    = https://github.com/hagezi/dns-blocklists/issues/11474
+#   ISS_11432    = https://github.com/hagezi/dns-blocklists/issues/11432
+#   ISS_11412    = https://github.com/hagezi/dns-blocklists/issues/11412
+#   L1T          = https://forum.level1techs.com/t/lg-tv-block-mini-how-to/255178
+#   KALLISTO_GIST= https://gist.github.com/KallistoX/ca0413c63e58799ecdfc516b64d603ff
+#   FURKAN_REPO  = https://github.com/furkan-bayrak/lg-tv-blocklist
+#   GN_VIDEO     = https://www.youtube.com/watch?v=6IFVTcM28KA
+#   Sep-12 list snapshot (adblock): https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/native.lgwebos.txt (version 2026.0918.2206.12 at capture)
+
+entries:
+  # ============ BLOCK: LG ad / ACR / telemetry ============
+  - domain: "lgsmartad.com"
+    source: "HAGEZI_RAW + ISS_11412 + L1T + KALLISTO_GIST"
+    source_rank: B
+    purpose: "LG ad solutions: ad server, CDP, boot-burst beacons"
+    confidence: high
+    evidence: "In current list as wildcard ||lgsmartad.com^ (added Sep 10, 2026 post-GN). Subdomains observed: us.ad.lgsmartad.com, us.info.lgsmartad.com (boot burst, ISS_11412), info.lgsmartad.com (~60s admanager poll, L1T rooted G5). Older regional hosts es/pt.ad.lgsmartad.com (issues #309/#1123)."
+    shared_infrastructure: false
+    suggested_action: BLOCK
+    notes: "Current list uses zone-wide wildcard ||lgsmartad.com^ - justified: whole zone is ad infrastructure, no firmware/functional hosts observed underneath."
+
+  - domain: "*-ad-lgsmartad-com.aws-prd.net (wildcard) + ~185 enumerated exact aws-prd.net hosts"
+    source: "HAGEZI_RAW + KALLISTO_GIST"
+    source_rank: B
+    purpose: "AWS-hosted LG ad/CDP/ACR backend (hostnames mirror the ad domain: -ad-, -info-, -rdx2-lgtvsdp- suffixes)"
+    confidence: high
+    evidence: "Pre-GN list had ~150 exact hosts; post-GN list has ~185 incl. -info-lgsmartad-com and -rdx2-lgtvsdp-com variants and eu7-info- (added Sep 10-12, 2026). Wildcard ||*-ad-lgsmartad-com.aws-prd.net^ added Sep 10. KallistoX wire capture (webOS 6, DE) confirms *-ad-lgsmartad-com.aws-prd.net traffic with everything opted out."
+    shared_infrastructure: true
+    suggested_action: BLOCK
+    notes: "AWS (shared infra). Wildcard justified: suffix -ad-lgsmartad-com marks ad endpoints only; the -info-/-rdx2- variants remain enumerated exactly rather than wildcarded."
+
+  - domain: "lgtvcommon.com"
+    source: "HAGEZI_RAW + L1T + KALLISTO_GIST + ISS_11412"
+    source_rank: B
+    purpose: "Mixed zone: telemetry/CDP (cdpbeacon, cdpsvc, api.adts 300s heartbeat, nudge, homeprv, rdl, netflixvoice voice proxy, qt2-kic.lab ThinQ AI lab) AND functional (wiseconfig, cpauth, qcardservice, recommend, wiseresource, pnv)"
+    confidence: medium-high
+    evidence: "Current list blocks zone-wide (||lgtvcommon.com^, added Sep 10, 2026). L1T (rooted G5) and author both call wildcard safe. KallistoX wire capture (webOS 6 DE) deliberately KEEPS EIC.wiseconfig.lgtvcommon.com reachable."
+    shared_infrastructure: false
+    suggested_action: BLOCK
+    notes: "CONTESTED. Zone-wide wildcard is what HaGeZi ships; KallistoX's capture-based approach carves out wiseconfig. If you need app-recommendation/config paths, block per-subdomain (cdpbeacon, cdpsvc, nudge, homeprv, rdl, netflixvoice, api.adts, qt2-kic.lab) instead of the zone."
+
+  - domain: "alphonso.tv"
+    source: "HAGEZI_RAW + L1T + KALLISTO_GIST"
+    source_rank: B
+    purpose: "ACR (Alphonso ad measurement platform)"
+    confidence: high
+    evidence: "In current list (apex + ||alphonso.tv^ added Sep 10, 2026). L1T: acr2 process configured against Alphonso, consent-gated. KallistoX community data point: webOS-5-era CX unit still queries prov-lg.alphonso.tv daily; webOS 6 unit never queried it."
+    shared_infrastructure: false
+    suggested_action: BLOCK
+    notes: "Wildcard justified (whole zone is ACR/ad). Prevalence is firmware-specific: common on <=webOS 5 era, absent on the observed webOS 6 unit. Blocking on a webOS 6 TV is harmless."
+
+  - domain: "lgads.tv"
+    source: "HAGEZI_RAW"
+    source_rank: B
+    purpose: "LG ad network"
+    confidence: medium-high
+    evidence: "In current list (||lgads.tv^ added Sep 10, 2026). Present in pre-GN list too."
+    shared_infrastructure: false
+    suggested_action: BLOCK
+    notes: "No conflicting reports found."
+
+  - domain: "ibs.nextlgsdp.com"
+    source: "HAGEZI_RAW + ISS_11474 + KALLISTO_GIST"
+    source_rank: B
+    purpose: "ibis_secure - in-app billing infrastructure (per hagezi), contacted even with all consents declined"
+    confidence: medium-high
+    evidence: "Blocked exactly in current list (survived the Sep 12 narrowing). KallistoX wire capture: DE.ibs.nextlgsdp.com 4 DNS + 4 TLS on fully-opted-out webOS 6 unit. hagezi in ISS_11474 calls ibs.* 'in-app billing infrastructure' yet keeps it blocked - tension recorded, not resolved."
+    shared_infrastructure: false
+    suggested_action: BLOCK
+    notes: "Exact host only (no wildcard) - deliberate after the Sep 12 fix. Regional variants (us./eu./de./aic./jp./eic. ibs.nextlgsdp.com) are NOT in the HaGeZi list; KallistoX's aggressive tier covers them if your TV never uses apps/store."
+
+  - domain: "ibsstat.nextlgsdp.com"
+    source: "HAGEZI_RAW + ISS_11474"
+    source_rank: B
+    purpose: "ibis_stat_secure - billing statistics"
+    confidence: medium-high
+    evidence: "Blocked exactly in current list. L1T sdx conf map: ibsstat.nextlgsdp.com -> ibis_stat_secure."
+    shared_infrastructure: false
+    suggested_action: BLOCK
+    notes: "Exact host only."
+
+  - domain: "rdx2.nextlgsdp.com"
+    source: "HAGEZI_RAW + L1T + KALLISTO_GIST"
+    source_rank: B
+    purpose: "rdx_secure - crash log / diagnostic upload (rdxd process, AutoUpload=true) and ACR path"
+    confidence: high
+    evidence: "Blocked exactly in current list. L1T rooted G5: uploadd/rdxd -> rdx2.nextlgsdp.com. KallistoX default tier blocks rdx2.nextlgsdp.com + regional variants."
+    shared_infrastructure: false
+    suggested_action: BLOCK
+    notes: "Exact host only in HaGeZi. KallistoX also blocks us/eu/de/aic/jp/eic.rdx2.nextlgsdp.com."
+
+  - domain: "rdx2.lgtvsdp.com"
+    source: "HAGEZI_RAW + KALLISTO_GIST"
+    source_rank: B
+    purpose: "Legacy (pre-nextlgsdp) ACR/crash path"
+    confidence: medium-high
+    evidence: "Blocked exactly in current list; KallistoX default tier includes it + regional variants as 'legacy ACR path'."
+    shared_infrastructure: false
+    suggested_action: BLOCK
+    notes: "Keep for older firmwares that still use the lgtvsdp.com zone."
+
+  # ============ KEEP: must stay reachable ============
+  - domain: "*.security.lgtvsdp.com"
+    source: "ISS_11474"
+    source_rank: B
+    purpose: "DRM/license issuance + device authentication"
+    confidence: high
+    evidence: "hagezi explicitly rejected blocking in ISS_11474 (2026-09-15): 'blocking risks breaking DRM playback and Content Store'."
+    shared_infrastructure: false
+    suggested_action: KEEP
+    notes: "Wildcard on this subzone is justified to KEEP (i.e. do not block any *.security.lgtvsdp.com)."
+
+  - domain: "cc.nextlgsdp.com (52 country subdomains: aj7, am, at, au, be, bg, br, br7, ca, ch, co, cz, de, dk, ee, eg, es, eu7, fi, fr, gb, gr, hk, hr, hu, id, ie, il, in, it, ja7, jp, lt, me, mx, my, nl, no, nz, ph, pl, pt, ro, ru, se, si, sv, th, tr, us, us7, vn, za)"
+    source: "ISS_11438 + L1T (post #20) + KALLISTO_GIST"
+    source_rank: B
+    purpose: "System time, store icons, app downloads, SDX service backbone (KallistoX: 'service backbone', 11 TLS sessions)"
+    confidence: high
+    evidence: "Sep 12 release 37522026.255.32391 explicitly ALLOWED all 52 after issue #11438 (blocking broke system time; YouTube/apps broke). AYM958 (IN): in.nextlgsdp.com=time, ngfts.nextlgsdp.com=store icons, kic-gfts=downloads. fade (L1T #20, C5/C1): exactly countrycode.nextlgsdp.com must stay up. KallistoX: blocking IN.nextlgsdp.com broke YouTube content loading (community data point). On the wire these prefixes are UPPERCASE (DE., EIC.)."
+    shared_infrastructure: false
+    suggested_action: KEEP
+    notes: "If you block nextlgsdp.com-related hosts, allow-list these 52. KallistoX additionally notes EIC. (not in the 52) appeared on the wire - allow eic. and any <region>. variants you observe."
+
+  - domain: "*gfts.nextlgsdp.com (aic-gfts, eic-gfts, kic-gfts, ngfts, ruc-gfts, ruc-hq-ngfts)"
+    source: "ISS_11438 + KALLISTO_GIST + ISS_995"
+    source_rank: B
+    purpose: "NGFTS (NG File Transfer Service) - firmware and app file downloads"
+    confidence: high
+    evidence: "Removed from blocking in the Sep 12 fix (ISS_11438: vdias ES - App Store needs ngfts.nextlgsdp.com + eic-gfts.nextlgsdp.com). KallistoX: eic-gfts.nextlgsdp.com (Akamai) = NGFTS file transfer; 'with unpatched webOS RCEs under responsible disclosure, a blocked update is worse than telemetry'."
+    shared_infrastructure: true
+    suggested_action: KEEP
+    notes: "Wildcard justified to KEEP: any host containing gfts in this zone is firmware/app transfer."
+
+  - domain: "*gfts.lge.com (ngfts, eic-ngfts, eic-qt2-ngfts, kic-ngfts, kic-qt2-ngfts, ruc-ngfts, qt2-ngfts + 4 .edgekey.net CDN variants)"
+    source: "HAGEZI pre-Sep-12 list + KALLISTO_GIST"
+    source_rank: B
+    purpose: "NGFTS firmware/app file transfer (older zone)"
+    confidence: high
+    evidence: "Was in the pre-GN list; removed in the Sep 12 fix (consistent with 'list does not block firmware/app updates'). KallistoX: gfts hosts exist on lge.com AND nextlgsdp.com AND tv.wiselg.com; script hard-refuses to block any *gfts* host. ISS_995 (2023): aic-gfts.lge.com breaks app installs."
+    shared_infrastructure: true
+    suggested_action: KEEP
+    notes: "NEVER block .lge.com wholesale (L1T explicit). edgekey.net variants are the Akamai/CDN delivery names - do not block the CDN itself."
+
+  - domain: "tv.wiselg.com"
+    source: "KALLISTO_GIST + ISS_11474 + L1T"
+    source_rank: C
+    purpose: "Hosts an NGFTS mirror (app updates / Content Store) per hagezi; observed EIC.tv.wiselg.com in wire capture"
+    confidence: medium
+    evidence: "KallistoX wire capture: EIC.tv.wiselg.com 2 DNS + 2 TLS on fully-opted-out unit; moved to his aggressive tier AFTER hagezi said it carries functional NGFTS. ISS_11412 lists *.tv.wiselg.com as telemetry-adjacent. What eic.tv.wiselg.com itself serves is unpublished."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Block only on a TV that never uses apps, Content Store, or paid services. 'Phones home' != 'ad' here."
+
+  - domain: "lgtvsdp.com (apex and non-carved subdomains)"
+    source: "L1T + ISS_1359 + KALLISTO_GIST"
+    source_rank: C
+    purpose: "Content Store (pre-nextlgsdp zone)"
+    confidence: medium-high
+    evidence: "ISS_1359 (2023): gb.lgtvsdp.com needed for Content Store. L1T author comments out lgtvsdp.com blocking by default (trade-off). KallistoX: webOS 6 unit never queried this zone (older firmwares do)."
+    shared_infrastructure: false
+    suggested_action: KEEP
+    notes: "Blocking is a deliberate trade-off (no store on older firmwares). rdx2.lgtvsdp.com is the one carved-out tracker (BLOCK entry above). smartshare.lgtvsdp.com: OPTIONAL - see below."
+
+  - domain: "lgappstv.com (apex)"
+    source: "L1T + KALLISTO_GIST"
+    source_rank: C
+    purpose: "Content Store / app platform"
+    confidence: medium-high
+    evidence: "L1T author comments out by default; KallistoX: webOS 6 unit never queried it, older lists (Perflyst-era) built around it miss current traffic."
+    shared_infrastructure: false
+    suggested_action: KEEP
+    notes: "Carved-out trackers in this zone (ad., ibs., ibis.) have their own entries below."
+
+  - domain: "lgshopsvc.lgappstv.com"
+    source: "L1T"
+    source_rank: C
+    purpose: "LG Shop service (store app backend)"
+    confidence: medium
+    evidence: "L1T lists it under SDX-adjacent; included in his commented-out store-trade-off set."
+    shared_infrastructure: false
+    suggested_action: KEEP
+    notes: "Functional (store)."
+
+  - domain: "snu.lge.com"
+    source: "L1T + KALLISTO_GIST"
+    source_rank: C
+    purpose: "OTA update notification"
+    confidence: high
+    evidence: "L1T: /usr/sbin/update -> snu/su/su-ssl/nsu.lge.com. KallistoX: 'snu.lge.com family = update notification', deliberately unblocked."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Blocking = no auto-updates = security trade-off (unpatched webOS RCEs). Rooted TVs should block (never update); unrooted TVs should keep it."
+
+  - domain: "su.lge.com"
+    source: "L1T"
+    source_rank: C
+    purpose: "OTA update download"
+    confidence: high
+    evidence: "L1T /usr/sbin/update endpoint set."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Same trade-off as snu.lge.com."
+
+  - domain: "su-ssl.lge.com"
+    source: "L1T"
+    source_rank: C
+    purpose: "OTA update download (TLS)"
+    confidence: high
+    evidence: "L1T /usr/sbin/update endpoint set."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Same trade-off as snu.lge.com."
+
+  - domain: "nsu.lge.com"
+    source: "L1T"
+    source_rank: C
+    purpose: "OTA update (NSU_CDN_TV_HE per forum link title)"
+    confidence: high
+    evidence: "L1T /usr/sbin/update endpoint set."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Same trade-off as snu.lge.com."
+
+  - domain: "snu-dev.lge.com"
+    source: "ISS_11474 + L1T"
+    source_rank: B
+    purpose: "OTA dev-channel update endpoint (not ads/tracking)"
+    confidence: medium-high
+    evidence: "hagezi rejected adding in ISS_11474: 'OTA dev endpoints, not ads/tracking'."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Relevant mainly for rooted TV hardening (block to force no dev-channel updates)."
+
+  - domain: "su-dev.lge.com"
+    source: "ISS_11474 + L1T"
+    source_rank: B
+    purpose: "OTA dev-channel update endpoint (not ads/tracking)"
+    confidence: medium-high
+    evidence: "hagezi rejected adding in ISS_11474: 'OTA dev endpoints, not ads/tracking'."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Relevant mainly for rooted TV hardening."
+
+  # ============ OPTIONAL: user trade-offs ============
+  - domain: "lgtviot.com (zone: api, commonpush, sports, ocp, push, buddy, eic, ...)"
+    source: "HAGEZI_DISC (Sep 10) + L1T + KALLISTO_GIST"
+    source_rank: B
+    purpose: "ThinQ/IoT push and device control (iot-client process)"
+    confidence: medium
+    evidence: "hagezi Sep 10: suggests ||lgtviot.com^ as OPTIONAL only (not in shipped list). KallistoX keeps eic.lgtviot.com reachable ('platform/config path'). L1T block set: api/commonpush/sports/ocp/push/buddy.lgtviot.com."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Block if you never use ThinQ/companion app or IoT features. Wildcard *.lgtviot.com is what hagezi suggested - justified (no firmware hosts observed underneath)."
+
+  - domain: "lgthinq.com (zone: common, connect-client, ...)"
+    source: "HAGEZI_DISC (Sep 10) + L1T"
+    source_rank: B
+    purpose: "ThinQ companion-app backend"
+    confidence: medium
+    evidence: "hagezi Sep 10: suggests ||lgthinq.com^ as OPTIONAL only. L1T block set: common/connect-client.lgthinq.com."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Block if you never use the ThinQ app. Wildcard justified per same reasoning."
+
+  - domain: "lgsmartweb.com"
+    source: "L1T"
+    source_rank: C
+    purpose: "Voice *search* backend only (voice input stack and hiLG wake word are local on the SoC)"
+    confidence: medium
+    evidence: "L1T voice section: blocking nextlgsdp.com (sdp_nlp) + lgsmartweb.com stops cloud voice round-trips; mic stack itself (voiceinput*/trigger_thinq/trigger_alexa) is local."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Blocking this does NOT disable the microphone - it only removes the cloud leg. Pair with consent decline for the local stack."
+
+  - domain: "nextlgsdp.com (bare apex, no cc prefix)"
+    source: "L1T + KALLISTO_GIST + ISS_11438"
+    source_rank: C
+    purpose: "SDX core on older/this-firmware (sdp_auth, sdp_init, sdp_common, sdp_logging, sdp_home, sdp_nlp voice NLP, sdp_onnow, sdp_search, sdp_apps, sdp_apps_resource, sdp_airplay, sdp_nais)"
+    confidence: medium
+    evidence: "L1T (rooted G5, webOS 10.2.1): sdx -> nextlgsdp.com apex, live 54.186.247.229:443. KallistoX (webOS 6 DE): the cc-prefixed hosts are what his unit used; apex not needed. The zone-wide wildcard blocked on Sep 10 broke time/store (ISS_11438) and was removed Sep 12."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Block only the bare apex (not the zone) IF your TV's traffic is apex-based (older firmware) AND you keep the 52 cc subs + gfts carve-outs. On the observed webOS 6 unit the apex was not queried at all - verify with your own capture before deciding."
+
+  - domain: "ueiwsp.com (apex) / www.ueiwsp.com"
+    source: "ISS_11474 + ISS_11412"
+    source_rank: C
+    purpose: "QuickSetAPI - UEI (user-experience-improvement) code database, polled every 5-10 min"
+    confidence: medium
+    evidence: "ISS_11412 annotation: 5-10 min poll. hagezi rejected blocking in ISS_11474: 'QuickSetAPI, no ad connection'. Consent-gated."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "User opt-in choice; not an ad domain. Timwun's Sep 7 wildcard request included *.ueiwsp.com but it was not adopted."
+
+  - domain: "ibs.lgappstv.com"
+    source: "KALLISTO_GIST"
+    source_rank: C
+    purpose: "In-app billing (per hagezi feedback via KallistoX)"
+    confidence: medium
+    evidence: "KallistoX aggressive tier (moved out of default after hagezi #11474 feedback): 'ibis.* is in-app billing infrastructure, not an ad beacon'."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Block only if the TV never uses apps/Content Store/paid services."
+
+  - domain: "ibis.lgappstv.com"
+    source: "KALLISTO_GIST"
+    source_rank: C
+    purpose: "In-app billing (per hagezi feedback via KallistoX)"
+    confidence: medium
+    evidence: "KallistoX aggressive base tier; same maintainer feedback as ibs.lgappstv.com."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Same trade-off as ibs.lgappstv.com."
+
+  - domain: "smartshare.lgtvsdp.com"
+    source: "KALLISTO_GIST"
+    source_rank: C
+    purpose: "Smart Share feature (LG TV-to-device sharing)"
+    confidence: low
+    evidence: "In KallistoX default tier (BASE_HOSTS); purpose inferred from name, not documented by LG."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Blocking breaks Smart Share; no privacy benefit documented. Low evidence."
+
+  - domain: "discovery.meethue.com"
+    source: "ISS_11412"
+    source_rank: D
+    purpose: "THIRD PARTY (Philips Hue): bridge discovery, 75-90 s poll"
+    confidence: medium
+    evidence: "ISS_11412 annotation. NOT LG infrastructure - only contacted when a Hue bridge is on the LAN."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Flagged: not LG. Block only if no Hue devices in use; otherwise breaks Hue integration."
+
+  # ============ UNKNOWN / dead ============
+  - domain: "elastic.lgwebostv.com"
+    source: "ISS_11474"
+    source_rank: D
+    purpose: "Unknown; possibly an Elasticsearch logging backend"
+    confidence: low
+    evidence: "Requested for blocking in ISS_11474; hagezi: 'unclear, possibly Elasticsearch backend' - not added."
+    shared_infrastructure: true
+    suggested_action: UNKNOWN
+    notes: "No action; re-observe if it appears in your own capture."
+
+  - domain: "h4g3z1-native.lgwebos.web.app"
+    source: "HAGEZI_RAW"
+    source_rank: B
+    purpose: "Unknown - Firebase-hosted 'h4g3z1-native' app; name pattern suggests HaGeZi's OWN test app, not LG telemetry"
+    confidence: low
+    evidence: "In current list (pre-dates Sep changes). The lgwebos.web.app / h4g3z1 naming is consistent with a HaGeZi test artifact rather than an LG domain."
+    shared_infrastructure: false
+    suggested_action: UNKNOWN
+    notes: "FLAGGED, not resolved. Blocking is harmless either way (it is in the shipped list), but it may not be LG infrastructure."
+
+  - domain: "initscr.lge.com"
+    source: "ISS_11432 + FURKAN_REPO"
+    source_rank: C
+    purpose: "Possibly boot-time setup telemetry (unverified)"
+    confidence: low
+    evidence: "Mentioned in ISS_11432; not in the HaGeZi list; no maintainer verification of purpose."
+    shared_infrastructure: false
+    suggested_action: UNKNOWN
+    notes: "Unverified. Do not block blindly - it is on lge.com where update infra lives."
+
+  - domain: "adsdtvc.com"
+    source: "ISS_11432 + FURKAN_REPO"
+    source_rank: C
+    purpose: "Observed on rooted LG G1 (DE, Aug-Sep 2026 capture); domain is DEAD"
+    confidence: low
+    evidence: "hagezi verified NXDOMAIN on public resolvers 2026-09-11 (comment 5634133124); furkan-bayrak confirmed and withdrew. 'Dead domains are not added to my lists.'"
+    shared_infrastructure: false
+    suggested_action: UNKNOWN
+    notes: "No action - name no longer resolves. Possibly device-internal or retired infra."
+
+  - domain: "smart.adtvc.app (and adtvc.app)"
+    source: "ISS_11432 + FURKAN_REPO"
+    source_rank: C
+    purpose: "Observed on rooted LG G1 capture; domain is DEAD"
+    confidence: low
+    evidence: "hagezi verified NXDOMAIN 2026-09-11; withdrawn by submitter."
+    shared_infrastructure: false
+    suggested_action: UNKNOWN
+    notes: "No action - NXDOMAIN."
+
+  - domain: "ad.lgappstv.com"
+    source: "ISS_11432 + KALLISTO_GIST"
+    source_rank: C
+    purpose: "Content Store ad serving (observed on rooted G1); DEAD on public resolvers"
+    confidence: low
+    evidence: "hagezi: NXDOMAIN as of 2026-09-11, not added. KallistoX's default tier still lists it (capture-based, Sep 2026) - conflict recorded: dead on public DNS at least in the EU at that date."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Blocking a dead name is harmless; keep only if you re-observe it on your own firmware/region."
+
+  # ============ IPs (firewall layer, not DNS) ============
+  - domain: "156.147.69.32 (IP, port 8080)"
+    source: "L1T"
+    source_rank: C
+    purpose: "HARDCODED OTA fallback: /usr/sbin/update hits /CheckSWAutoUpdate.laf on this IP when DNS for the lge.com update hosts fails"
+    confidence: medium
+    evidence: "Read off the rooted G5 target (binary/hosts inspection). Blocking the update DOMAINS actively routes the TV to this raw IP - DNS-only blocking is insufficient for OTA."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Firewall-layer only (DNS cannot block an IP the TV already has). Block if you accept no OTA; keep if you want updates. IP may differ per firmware/region - re-verify."
+
+  - domain: "54.186.247.229 (IP, port 443)"
+    source: "L1T"
+    source_rank: C
+    purpose: "Live AWS endpoint for SDX telemetry (what nextlgsdp.com resolved to on the target)"
+    confidence: low
+    evidence: "Observed live on the rooted G5 on 2026-08-24. AWS IPs are volatile; name-based blocking is preferred."
+    shared_infrastructure: true
+    suggested_action: UNKNOWN
+    notes: "Monitor only (netflow/eBPF alerting). Do not build a block on it; it will change."
+
+  # ============ Third-party trackers observed on LG TVs (not LG infra) ============
+  - domain: "cws.conviva.com"
+    source: "ISS_11412"
+    source_rank: D
+    purpose: "THIRD PARTY (Conviva/Vizio): video QoM with per-device-fingerprint subdomains"
+    confidence: medium
+    evidence: "ISS_11412 annotation; fingerprint subdomain pattern noted."
+    shared_infrastructure: true
+    suggested_action: OPTIONAL
+    notes: "Covered by general ad/QoM lists; not LG-specific."
+
+  - domain: "api.ipify.org"
+    source: "ISS_11412"
+    source_rank: D
+    purpose: "THIRD PARTY: public-IP lookup (TV fetches its own external IP)"
+    confidence: medium
+    evidence: "ISS_11412 annotation."
+    shared_infrastructure: true
+    suggested_action: OPTIONAL
+    notes: "Low-risk block; covered by general lists."
+
+  - domain: "na-ssp-pix.adstk.io"
+    source: "ISS_11412"
+    source_rank: D
+    purpose: "THIRD PARTY (AdTech SSP, Amazon ad stack): ad pixel/SSP"
+    confidence: medium
+    evidence: "ISS_11412 annotation."
+    shared_infrastructure: true
+    suggested_action: OPTIONAL
+    notes: "Covered by general ad lists."
+
+  - domain: "pagead2.googlesyndication.com"
+    source: "ISS_11412"
+    source_rank: D
+    purpose: "THIRD PARTY (Google): ad serving"
+    confidence: medium
+    evidence: "ISS_11412 annotation."
+    shared_infrastructure: true
+    suggested_action: OPTIONAL
+    notes: "Covered by general ad lists."
+
+  - domain: "imasdk.googleapis.com"
+    source: "ISS_11412"
+    source_rank: D
+    purpose: "THIRD PARTY (Google IMA): video ad SDK"
+    confidence: medium
+    evidence: "ISS_11412 annotation."
+    shared_infrastructure: true
+    suggested_action: OPTIONAL
+    notes: "Covered by general ad lists."
+
+  - domain: "static.doubleclick.net"
+    source: "ISS_11412"
+    source_rank: D
+    purpose: "THIRD PARTY (Google DoubleClick): ad measurement"
+    confidence: medium
+    evidence: "ISS_11412 annotation."
+    shared_infrastructure: true
+    suggested_action: OPTIONAL
+    notes: "Covered by general ad lists."
+
+  - domain: "cdn-media.brightline.tv"
+    source: "ISS_11412"
+    source_rank: D
+    purpose: "THIRD PARTY (Brightline): ad media CDN"
+    confidence: low
+    evidence: "ISS_11412 annotation only."
+    shared_infrastructure: true
+    suggested_action: OPTIONAL
+    notes: "Covered by general ad lists."
+
+  # ============ HbbTV / broadcast audience measurement (DE linear TV, KallistoX capture) ============
+  - domain: "tr.technical-service.net"
+    source: "KALLISTO_GIST"
+    source_rank: C
+    purpose: "THIRD PARTY (RTL): HbbTV audience measurement, observed watching German linear TV"
+    confidence: medium
+    evidence: "KallistoX broadcast tier (8 entries), wire capture Sep 2026."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Broadcast-only; block if you watch linear TV and accept losing audience stats (no functional impact)."
+
+  - domain: "scheduler.hbbtv.smartclip.net"
+    source: "KALLISTO_GIST"
+    source_rank: C
+    purpose: "THIRD PARTY (smartclip): HbbTV ad scheduler"
+    confidence: medium
+    evidence: "KallistoX broadcast tier."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Ad scheduler; app assets left unblocked so red-button apps keep working."
+
+  - domain: "de-config-preproduction.sensic.net"
+    source: "KALLISTO_GIST"
+    source_rank: C
+    purpose: "THIRD PARTY (GfK): TV audience measurement config"
+    confidence: medium
+    evidence: "KallistoX broadcast tier."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "GfK audience measurement."
+
+  - domain: "de1preprod-s2s.sensic.net"
+    source: "KALLISTO_GIST"
+    source_rank: C
+    purpose: "THIRD PARTY (GfK): server-to-server measurement"
+    confidence: medium
+    evidence: "KallistoX broadcast tier."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "GfK audience measurement."
+
+  - domain: "*.trk.sensic.net"
+    source: "KALLISTO_GIST"
+    source_rank: C
+    purpose: "THIRD PARTY (GfK): per-device hashed beacons (<device-id>.trk.sensic.net)"
+    confidence: medium
+    evidence: "KallistoX broadcast tier; wildcard because subdomain is a per-device hash."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "WILDCARD JUSTIFIED: subdomain names are per-device hashed, cannot be enumerated."
+
+  - domain: "secure-eu.nmrodam.com"
+    source: "KALLISTO_GIST"
+    source_rank: C
+    purpose: "THIRD PARTY (Nielsen): TV audience measurement"
+    confidence: medium
+    evidence: "KallistoX broadcast tier."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Nielsen audience measurement."
+
+  - domain: "cdn-gl.nmrodam.com"
+    source: "KALLISTO_GIST"
+    source_rank: C
+    purpose: "THIRD PARTY (Nielsen): measurement CDN"
+    confidence: medium
+    evidence: "KallistoX broadcast tier."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "Nielsen audience measurement."
+
+  - domain: "*.nuid.nmrodam.com"
+    source: "KALLISTO_GIST"
+    source_rank: C
+    purpose: "THIRD PARTY (Nielsen): per-device hashed beacons (<device-id>.nuid.nmrodam.com)"
+    confidence: medium
+    evidence: "KallistoX broadcast tier; wildcard because subdomain is a per-device hash."
+    shared_infrastructure: false
+    suggested_action: OPTIONAL
+    notes: "WILDCARD JUSTIFIED: per-device hashed subdomains."

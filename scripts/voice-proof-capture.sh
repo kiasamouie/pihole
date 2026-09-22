@@ -30,10 +30,11 @@ LABEL="${1:-voice-proof}"
 TV="192.168.0.197"
 if [ -f "$ROOT/config/privacy-policy.yaml" ]; then
   TV=$(python3 -c '
-import yaml
-doc = yaml.safe_load(open("%s/config/privacy-policy.yaml"))
+import sys, yaml
+with open(sys.argv[1]) as policy:
+    doc = yaml.safe_load(policy)
 print((doc.get("applies_to") or ["192.168.0.197"])[0])
-' "$ROOT")
+' "$ROOT/config/privacy-policy.yaml")
 fi
 
 echo "====================================================================="

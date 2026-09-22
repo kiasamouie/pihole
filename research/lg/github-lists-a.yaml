@@ -1,0 +1,107 @@
+# LG webOS DNS blocklist entries — source: samsapti/LG-webOS-Blocklist
+# List: https://raw.githubusercontent.com/samsapti/LG-webOS-Blocklist/main/list.txt (fetched 2026-09-22, 10 domains)
+# Repo: https://github.com/samsapti/LG-webOS-Blocklist — created 2023-05-29, last push 2023-05-31, 6 commits,
+#       25 stars, 3 forks, MIT. Single-maintainer, community, NOT actively maintained (3+ yrs, no updates).
+# Methodology: manually curated, single-setup, ABP-syntax DNS list; claims "non-breaking" (only blocks what
+#   doesn't break normal webOS functionality) and assumes TV tracking settings are already disabled in the UI.
+# Corroboration for lgtvonline.lge.com as LG ACR endpoint: IMC 2024 paper (Anselmi et al., doi:10.1145/3646547.3689013).
+
+- domain: lgtvonline.lge.com
+  source: samsapti/LG-webOS-Blocklist (community list) + IMC 2024 paper (peer-reviewed)
+  source_rank: A
+  purpose: LG online services / ACR tracking endpoint
+  confidence: medium (ranked A on corroboration, but exact endpoint path/port not verified from fetched sources — full paper PDF not reviewed)
+  evidence: Present in samsapti list.txt; reported as LG's ACR endpoint in Anselmi et al. IMC 2024
+  shared_infrastructure: lge.com (LG global domain, also used for non-tracking services)
+  suggested_action: BLOCK
+  notes: Primary candidate for ACR blocking; verify it is not reused for non-ACR functions before shipping
+
+- domain: lgsmartad.com
+  source: samsapti/LG-webOS-Blocklist
+  source_rank: C
+  purpose: LG Smart Ad (LG's own ad serving for webOS)
+  confidence: high (LG-owned, name unambiguous)
+  evidence: list.txt entry; domain name is explicit
+  shared_infrastructure: LG advertising platform
+  suggested_action: BLOCK
+  notes: Pure ad traffic; no known functional dependency
+
+- domain: ad.lgappstv.com
+  source: samsapti/LG-webOS-Blocklist
+  source_rank: C
+  purpose: Ad serving for LG App Store TV apps (webOS app platform)
+  confidence: high (LG-owned, name unambiguous)
+  evidence: list.txt entry; lgappstv.com is the LG webOS app platform domain
+  shared_infrastructure: LG webOS app platform (lgappstv.com parent)
+  suggested_action: BLOCK
+  notes: "ad." subdomain only — parent lgappstv.com must remain reachable for app store functions
+
+- domain: recommend.lgtvcommon.com
+  source: samsapti/LG-webOS-Blocklist
+  source_rank: C
+  purpose: Content/personalization recommendation service on webOS
+  confidence: high
+  evidence: list.txt entry; subdomain of LG webOS "common" telemetry/UX platform
+  shared_infrastructure: lgtvcommon.com (shared webOS UX/telemetry platform with service/homeprv/nudge)
+  suggested_action: BLOCK
+  notes: Blocking removes recommendation tiles; per maintainer this does not break core TV functionality
+
+- domain: service.lgtvcommon.com
+  source: samsapti/LG-webOS-Blocklist
+  source_rank: C
+  purpose: webOS service/telemetry endpoint (part of LG webOS "HomePerv"-class telemetry platform)
+  confidence: medium (exact role not independently verified; subdomain suggests shared platform)
+  evidence: list.txt entry
+  shared_infrastructure: lgtvcommon.com (shared with recommend/homeprv/nudge subdomains)
+  suggested_action: OPTIONAL
+  notes: Highest breakage risk in the list if "service." subdomain is used by app-launch or update flows; samsapti reports no breakage on their setup only — test on your own TV
+
+- domain: homeprv.lgtvcommon.com
+  source: samsapti/LG-webOS-Blocklist
+  source_rank: C
+  purpose: webOS telemetry ("homeprv" — home-page/privacy telemetry collection)
+  confidence: high
+  evidence: list.txt entry
+  shared_infrastructure: lgtvcommon.com
+  suggested_action: BLOCK
+  notes: Telemetry only; no functional dependency
+
+- domain: nudge.lgtvcommon.com
+  source: samsapti/LG-webOS-Blocklist
+  source_rank: C
+  purpose: Personalized "nudge"/engagement prompts on webOS
+  confidence: high
+  evidence: list.txt entry
+  shared_infrastructure: lgtvcommon.com
+  suggested_action: BLOCK
+  notes: UX engagement tracking; blocking removes nudge prompts
+
+- domain: rdx2.lgtvsdp.com
+  source: samsapti/LG-webOS-Blocklist
+  source_rank: C
+  purpose: LG Smart Delivery Platform (rdx = delivery, "2" = generation)
+  confidence: medium (exact role inferred from LG Smart Delivery Platform naming)
+  evidence: list.txt entry
+  shared_infrastructure: lgtvsdp.com (LG content/feature delivery)
+  suggested_action: OPTIONAL
+  notes: Delivery platform could touch app/feature delivery paths — validate on device before default-blocking
+
+- domain: www.ueiwsp.com
+  source: samsapti/LG-webOS-Blocklist
+  source_rank: C
+  purpose: Unknown; appears to be a third-party ad/traffic network observed on webOS (not LG-owned)
+  confidence: low (no independent documentation found in fetched sources)
+  evidence: list.txt entry only
+  shared_infrastructure: none known
+  suggested_action: OPTIONAL
+  notes: Investigate/verify what service this is before default-blocking; third-party domain on a TV may be an app's ad SDK
+
+- domain: mediaservices.cdn-apple.com
+  source: samsapti/LG-webOS-Blocklist
+  source_rank: C
+  purpose: Apple media services CDN (likely AirPlay/iOS-related, not LG-native)
+  confidence: high that it is Apple's, low that it belongs in an LG ACR blocklist
+  evidence: list.txt entry; clearly Apple-owned domain
+  shared_infrastructure: Apple (cdn-apple.com)
+  suggested_action: OPTIONAL
+  notes: Blocking this on a home network can break AirPlay/media playback from Apple devices; likely a false-positive-style entry for privacy purposes — keep only if you want to sever Apple's media telemetry

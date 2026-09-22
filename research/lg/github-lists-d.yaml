@@ -1,0 +1,358 @@
+#
+# research/lg/github-lists-d.yaml - LG webOS endpoint families named by primary
+# sources of the September 2026 Gamers Nexus / LG Ad Solutions controversy,
+# with suggested DNS/firewall actions for the privacy policy.
+#
+# Evidence snapshot date: 2026-09-22.
+#
+# Source ranks:
+#   A  peer-reviewed / reproducible research (IMC 2024, arXiv:2409.06203)
+#   B  major-outlet investigation with reproducible methodology (Gamers Nexus,
+#      Level1Techs firmware/network recon on a retail OLED65G5WUA, webOS 10.2.1)
+#   C  vendor statement / vendor documentation (LG's own - vendor-confirmed,
+#      NOT independent evidence)
+#   D  press summary without primary source
+#
+# Primary sources:
+#   L1T guide      forum.level1techs.com/t/lg-tv-block-mini-how-to/255178
+#                  (post 2026-09-05, recon 2026-08-24; the G5WUA endpoint map)
+#   IMC 2024       arXiv:2409.06203 (Anselmi et al., "Watching TV with the
+#                  Second-Party" - Alphonso ACR endpoints + cadence + opt-out)
+#   LG statement   lg.com/us/newsroom 2026-09-12 (see research/lg/lg-official.md)
+#   LG Ad Solutions  lgads.tv (see research/lg/lg-official.md section 2)
+#
+# Cross-references:
+#   research/github/snapshots/fightback-research-notes.md  "## LG, webOS" section
+#                   (repo-relative; the domain inventory + documented breakage)
+#   research/lg/lg-official.md, research/lg/gamers-nexus-2026.md
+#   Community lists for cross-check: TheShawnMiranda/LG-TV-Ad-Block,
+#     hugobatista/lg-tv-ad-block, AMV007/lg_tv_blocklist,
+#     kkl1974/LG-WebOS-AdGuard-blocklist, athimannil/webos-pihole-blocklists,
+#     samsapti/LG-webOS-Blocklist, webosbrew/webos-homebrew-channel,
+#     Informatic/RootMyTV, dr0dr1dr2dr3/lgappupdateblocker;
+#     hagezi "native.lgwebos" (341 entries).
+#
+# suggested_action values (this file):
+#   BLOCK     no core-function breakage documented; telemetry/ad plane
+#   KEEP      essential to the TV's core operation (do not block)
+#   OPTIONAL  blocking works but degrades a specific user-facing feature (see notes)
+#   UNKNOWN   insufficient evidence or shared third-party infrastructure
+#
+# Global rule: do NOT block .lge.com wholesale (kills Content Store); block only the
+# OTA hosts (KEEP) vs. the AI/LLM subdomains (OPTIONAL) selectively.
+#
+
+entries:
+
+  # --- LG first-party ACR (Alphonso) ------------------------------------------
+
+  - domain: alphonso.tv
+    endpoints: [eu-acrX.alphonso.tv, tkacrX.alphonso.tv]   # X rotates by region
+    source: "https://arxiv.org/abs/2409.06203 (IMC 2024); lgads.tv (LG docs)"
+    source_rank: "A + C"
+    purpose: "LG first-party ACR / viewing-fingerprint upload via Alphonso, LG-owned since 2021"
+    confidence: high
+    evidence:
+      imc2024: "eu-acrX (EU/UK) / tkacrX (US); frames sampled every 10 ms, batched every 15 s, peak every minute; opt-out STOPS the traffic (verified in the paper's testbed)"
+      firmware: "/usr/sbin/acr2 + /mnt/lg/cmn_data/acr/acr.xml (ACR_On=true) + Alphonso client token (L1T G5WUA)"
+      vendor: "LG 2026-09-12 statement concedes ACR on Live TV/HDMI and flow to LG Ad Solutions (majority-owned affiliate)"
+    shared_infrastructure: "LG-owned; distinct from ad/telemetry planes"
+    suggested_action: BLOCK
+    notes: "The opt-out setting (User Agreements -> Viewing Information / ACR off; marker
+      /mnt/lg/cmn_data/acr/data/eula_disallowed_rebooted) demonstrably stops this traffic,
+      so blocking is functionally consistent with the vendor opt-out. No core TV function
+      breaks when ACR is off."
+
+  - domain: choice.alphonso.tv
+    source: "lgads.tv (LG docs)"
+    source_rank: C
+    purpose: "Alphonso opt-out / consent portal"
+    confidence: medium
+    evidence:
+      vendor: "named in LG Ad Solutions material as the opt-out destination"
+    shared_infrastructure: "LG-owned"
+    suggested_action: KEEP
+    notes: "Only relevant if the user wants to opt out via the web portal instead of the TV
+      setting. Low traffic. Not a telemetry endpoint itself."
+
+  # --- LG Ad Solutions (brand, no TV phone-home) ------------------------------
+
+  - domain: lgads.tv
+    source: "lgads.tv (LG docs); forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: "C + B"
+    purpose: "LG Ad Solutions brand / marketing / policy site"
+    confidence: high
+    evidence:
+      vendor: "privacy policy + technology pages (lg-official.md section 2)"
+      l1t: "the TV does NOT phone home to this domain (recon)"
+    shared_infrastructure: "LG-owned; marketing surface only"
+    suggested_action: BLOCK
+    notes: "Blocking has no documented breakage: the TV never contacts it. Blocked to close
+      the door in case a firmware revision adds phone-home."
+
+  # --- Telemetry: sdx platform -------------------------------------------------
+
+  - domain: nextlgsdp.com
+    endpoints:
+      [us.nextlgsdp.com, ibs.nextlgsdp.com, ibsstat.nextlgsdp.com,
+       rdx2.nextlgsdp.com, ngfts.nextlgsdp.com, aic-gfts.nextlgsdp.com]
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "sdx telemetry: sdp_logging, sdp_nlp (voice NLP backend), sdp_search, sdp_apps, crash upload, ibis"
+    confidence: high
+    evidence:
+      l1t: "endpoint map in /mnt/lg/cmn_data/sdp/sdx/server_addr_version.conf on G5WUA webOS 10.2.1"
+      perflyst: "'# Gamers Nexus - LG Smart TV spying' section blocks us./ngfts./aic-gfts. nextlgsdp.com"
+    shared_infrastructure: "LG-owned sdx plane"
+    suggested_action: BLOCK
+    notes: "Selective: on some models (Perflyst C5/C1) the APEX nextlgsdp.com (specifically
+      countrycode_nextlgsdp) is needed by the Content Store. If that hits you, block the
+      telemetry subdomains individually and allow the apex."
+
+  - domain: lgtvcommon.com
+    endpoints:
+      [netflixvoice.lgtvcommon.com, nudge.lgtvcommon.com, homeprv.lgtvcommon.com,
+       wiseconfig.lgtvcommon.com, pnv.lgtvcommon.com, recommend.lgtvcommon.com,
+       cdpsvc.lgtvcommon.com, cpauth.lgtvcommon.com, cdpbeacon.lgtvcommon.com,
+       rdl.lgtvcommon.com, wiseresource.lgtvcommon.com, qcardservice.lgtvcommon.com,
+       qt2-kic.lab.lgtvcommon.com, aic.cdpsvc.lgtvcommon.com, aic.cdpbeacon.lgtvcommon.com,
+       aic.rdl.lgtvcommon.com]
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "Telemetry, CDP beacons, recommendations, voice proxy, home screen, ThinQ AI lab"
+    confidence: high
+    evidence:
+      l1t: "observed from G5WUA; cdpbeacon/cdpsvc/homeprv/nudge/rdl/wiseconfig/recommend/service/ads + aic.* variants"
+      perflyst: "aic.cdpsvc, aic.cdpbeacon, aic.rdl in the Gamers Nexus section"
+    shared_infrastructure: "LG-owned"
+    suggested_action: BLOCK
+    notes: "No core-function breakage documented. aic.* = the AI/ThinQ variant of the same
+      services (block together)."
+
+  # --- Advertising ---------------------------------------------------------------
+
+  - domain: lgsmartad.com
+    endpoints:
+      ["<cc>.lgsmartad.com (~159 country-prefixed hosts)",
+       "info.lgsmartad.com",
+       "<cc>-ad-lgsmartad-com.aws-prd.net (163 AWS mirrors)"]
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "Advertising delivery + ad config polling"
+    confidence: high
+    evidence:
+      l1t: "info.lgsmartad.com polled ~every 60 s by /usr/sbin/admanager; regex (^|\\.)lgsmartad\\.com covers the family; use the regex because of the 163 aws-prd.net mirrors"
+    shared_infrastructure: "LG ads, mirrored on AWS (aws-prd.net)"
+    suggested_action: BLOCK
+    notes: "Use the regex on the whole family including the .aws-prd.net mirrors. No core
+      breakage documented; worst case ads fail to render (the intended outcome)."
+
+  - domain: yumenetworks.com
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "Third-party ad serving (NOT LG-owned)"
+    confidence: medium
+    evidence:
+      l1t: "observed on the G5 ad stack"
+    shared_infrastructure: "third-party (Yum) ad network"
+    suggested_action: BLOCK
+    notes: "Third-party ad tech on the LG stack - block for privacy; no TV function breaks."
+
+  - domain: smartclip.com
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "Third-party ad serving (NOT LG-owned)"
+    confidence: medium
+    evidence:
+      l1t: "observed on the G5 ad stack"
+    shared_infrastructure: "third-party ad network"
+    suggested_action: BLOCK
+    notes: "Third-party ad tech on the LG stack."
+
+  - domain: lgad.cjpowercast.com.edgesuite.net
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "LG ad delivery via CJ PowerCast / Akamai edge"
+    confidence: medium
+    evidence:
+      l1t: "observed on the G5 ad stack"
+    shared_infrastructure: "CJ PowerCast (ad vendor) on Akamai edge"
+    suggested_action: BLOCK
+    notes: "Third-party (CJ) but LG-specific (lgad prefix on their domain)."
+
+  # --- ThinQ / IoT (feature-gated) -----------------------------------------------
+
+  - domain: lgtviot.com
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "ThinQ / IoT (api, commonpush, sports, ocp, push, buddy, common, connect-client)"
+    confidence: high
+    evidence:
+      l1t: "observed on G5WUA; feeds the ThinQ phone app"
+    shared_infrastructure: "LG IoT cloud"
+    suggested_action: OPTIONAL
+    notes: "Blocking breaks ThinQ-app control of the TV/IoT devices only. Keep if the TV is
+      used as a ThinQ controller for other LG devices; block if it is a standalone TV."
+
+  - domain: lgthinq.com
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "ThinQ app backend (push, common, connect-client, sports, ocp)"
+    confidence: high
+    evidence:
+      l1t: "observed on G5WUA"
+    shared_infrastructure: "LG IoT cloud"
+    suggested_action: OPTIONAL
+    notes: "Same trade-off as lgtviot.com: breaks the ThinQ app integration only."
+
+  # --- OTA (keep) -----------------------------------------------------------------
+
+  - domain: lge.com
+    endpoints: [snu.lge.com, su.lge.com, su-ssl.lge.com, nsu.lge.com]
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "OTA / firmware updates"
+    confidence: high
+    evidence:
+      l1t: "update paths reference these hosts"
+    shared_infrastructure: "LG corporate zone"
+    suggested_action: KEEP
+    notes: "Firmware + security updates (LG commits to 5 years per 2026-09-12 statement).
+      DO NOT block .lge.com wholesale - see ngfts.lge.com entry."
+
+  # --- LG LLM / AI platform -------------------------------------------------------
+
+  - domain: ngfts.lge.com
+    endpoints:
+      [ngfts.lge.com, qt2.lge.com-variants, kic.lge.com-variants,
+       eic.lge.com-variants, ruc.lge.com-variants, aic-ngfts.lge.com]
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "LG LLM / AI platform (ThinQ AI, 'hiLG' cloud NLP back-end plane)"
+    confidence: high
+    evidence:
+      l1t: "observed on G5WUA; qt2-/kic-/eic-/ruc-/aic- prefixed variants"
+      fightback: "DOCUMENTED BREAKAGE: blocking ngfts.lge.com breaks Content Store thumbnails"
+    shared_infrastructure: "LG AI cloud"
+    suggested_action: OPTIONAL
+    notes: "Blocking works for privacy (AI features off) but Content Store thumbnails break
+      (fightback-research-notes.md). Accept that cosmetic breakage or keep, per policy tier."
+
+  # --- Content Store / apps (keep) --------------------------------------------------
+
+  - domain: lgtvsdp.com
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "Content Store (-> 'LG Apps' since 2026-04-29), Smart Share (smartshare.), ibis (us.rdx2.)"
+    confidence: high
+    evidence:
+      l1t: "observed on G5WUA; perflyst issue 117: us.lgtvsdp.com breaks the store"
+    shared_infrastructure: "LG app-store plane"
+    suggested_action: KEEP
+    notes: "Blocking breaks the Content Store / app ecosystem (documented). Also hosts the
+      Smart Media Product Membership Privacy Policy pages."
+
+  - domain: lgappstv.com
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "LG Apps store (ibis, us.ibis, ad subdomains), LG Shop, account/portal surface"
+    confidence: high
+    evidence:
+      l1t: "ibis.lgappstv.com, us.ibis.lgappstv.com, ad.lgappstv.com observed; ad.* could be
+        blocked individually without breaking the store itself (unverified)"
+    shared_infrastructure: "LG app-store plane"
+    suggested_action: KEEP
+    notes: "Keep the zone; if the store keeps working, ad.lgappstv.com can be tested for
+      individual blocking. The store zone also serves the login-gated Smart Media Product
+      Membership Privacy Policy."
+
+  # --- Voice / account-adjacent (optional) ------------------------------------------
+
+  - domain: lgsmartweb.com
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "Voice-search / LG web search backend"
+    confidence: high
+    evidence:
+      l1t: "blocking breaks voice search only; L1T recommends blocking"
+      fightback: "documented: breaks voice search"
+    shared_infrastructure: "LG web/voice search"
+    suggested_action: OPTIONAL
+    notes: "Breaks on-TV web search / voice search results only. L1T recommends blocking;
+      keep if the TV is used as a household web-search terminal."
+
+  - domain: lggalleryplus.com
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "LG account / Gallery Plus (smart-account plane)"
+    confidence: medium
+    evidence:
+      l1t: "observed on G5WUA"
+    shared_infrastructure: "LG account cloud"
+    suggested_action: OPTIONAL
+    notes: "Breaks cross-device photo/gallery sync if used; not needed for TV core."
+
+  - domain: tv.wiselg.com
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "LG 'buddy' / smart-account companion service"
+    confidence: medium
+    evidence:
+      l1t: "observed on G5WUA"
+    shared_infrastructure: "LG account cloud"
+    suggested_action: OPTIONAL
+    notes: "Not needed for TV core operation."
+
+  # --- Shared third-party infrastructure (not DNS-blockable) --------------------------
+
+  - domain: iot.<region>.amazonaws.com
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "AWS IoT MQTT push notifications (per-device certificates)"
+    confidence: high
+    evidence:
+      l1t: "per-device certs observed; LG uses AWS IoT for device push"
+    shared_infrastructure: "AWS (shared with thousands of other services)"
+    suggested_action: UNKNOWN
+    notes: "Cannot be blocked by DNS without collateral damage (shared AWS zone, wildcard
+      regional names). Mitigation is firewall-level if the MQTT egress IP set is identified,
+      or accept it."
+
+  - domain: 156.147.69.32:8080
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "Hardcoded OTA fallback in /usr/sbin/update (IP literal)"
+    confidence: high
+    evidence:
+      l1t: "IP is hardcoded in the update binary - DNS filtering cannot see it"
+    shared_infrastructure: "LG (IP not behind a name)"
+    suggested_action: BLOCK
+    notes: "Firewall-only action: block egress to the IP:port. Do NOT put in a DNS blocklist
+      (no name to resolve). Blocking removes the OTA fallback path - the named OTA hosts
+      (su/su-ssl/snu/nsu.lge.com) remain."
+
+  - domain: 54.186.247.229:443
+    source: "forum.level1techs.com/t/lg-tv-block-mini-how-to/255178"
+    source_rank: B
+    purpose: "Live sdx telemetry endpoint (IP literal, AWS)"
+    confidence: high
+    evidence:
+      l1t: "observed live on the G5; sdx phones home to an AWS IP"
+    shared_infrastructure: "AWS"
+    suggested_action: BLOCK
+    notes: "Firewall-only action (IP:443 on an AWS edge; verify ownership before a blanket
+      egress rule - an AWS IP can be shared). DNS cannot catch it."
+
+  # --- Vendor documentation surfaces (not TV phone-home) -----------------------------
+
+  - domain: lg.com
+    source: "https://www.lg.com/us/newsroom/corporate/statement-understanding-privacy-on-lg-smart-tvs; lg.com/*/privacy"
+    source_rank: C
+    purpose: "LG corporate site: 2026-09-12 privacy statement, privacy policies, newsroom"
+    confidence: high
+    evidence:
+      vendor: "statement + privacy pages (lg-official.md sections 1 and 3)"
+    shared_infrastructure: "LG corporate web (Akamai; 403 for bot fetches)"
+    suggested_action: KEEP
+    notes: "Documented here for the domain register; the TV does not depend on it for
+      operation. Cited as source, not as a block/keep decision."

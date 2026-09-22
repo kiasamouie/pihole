@@ -31,6 +31,8 @@ data/manufacturer-unknown/
 
 # Mined raw DNS history + resolution scratch (contains raw query logs - never commit)
 research/tmp/
+research/tmp-lg/
+reports/raw/lan-refresh-*/
 
 # Python bytecode
 __pycache__/
