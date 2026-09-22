@@ -33,15 +33,16 @@ It removes **only**:
 | Removed | Mechanism |
 |---|---|
 | `tv_privacy_blocked` / `tv_doh_blocked` sets + privacy/DoT drop rules | re-render of `table ip tvguard` with privacy state `off` — NAT, masquerade, DNS-bypass DNAT, monitor mode, UFW route rules all verified still present afterwards |
-| Pi-hole group `TVGuard-Privacy` + its deny entries (exact **and** the aibixby.com regex/suffix row) + client attachments | `POST /api/groups:batchDelete` + `POST /api/domains:batchDelete` (v6 API; each row is deleted with its own kind, so the suffix regex is removed too); other groups untouched |
+| Pi-hole group `TVGuard-Privacy` + all 70 rows (37 exact denies, 14 regex/zone denies — aibixby + the 13 mlock Samsung zones — and the **19 mlock keep/allow rows**, which are removed too so no manufacturer allow rows survive) + client attachments | `POST /api/groups:batchDelete` + `POST /api/domains:batchDelete` (v6 API; each row is deleted with its own kind, so the suffix/zone regexes are removed too); other groups untouched |
 | state file `/var/lib/tvguard/privacy-state` | rewritten to `PRIVACY=off` |
 
 Note: disabling the policy does not by itself kill already-open TV connections
-to voice IPs (the deny rule matches new connections only). If you disabled
-mid-voice-session and want the TV's state fully clean, additionally run
-`sudo scripts/privacy-reset-tv-voice-state.sh` — it only touches the target
-TV's conntrack entries toward the resolved voice IPs (never the global
-table, never other clients).
+to blocked IPs (the deny rule matches new connections only). If you disabled
+mid-session and want the TV's state fully clean, additionally run
+`sudo scripts/privacy-reset-tv-voice-state.sh` (voice IPs) or
+`sudo scripts/privacy-reset-tv-manufacturer-state.sh` (all denied
+manufacturer-lockdown IPs) — both only touch the target TV's conntrack
+entries (never the global table, never other clients).
 
 The TV keeps its full Internet path (it never lost it — disabling only
 removes the deny rules). No TV-side change needed. The disable script is

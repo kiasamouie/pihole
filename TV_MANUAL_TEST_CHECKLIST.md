@@ -2,6 +2,14 @@
 
 For: Samsung QE65Q75CATXXU at `192.168.0.197` (gateway + DNS = `192.168.0.128`).
 
+**Current profile: `manufacturer-lockdown` (live since 2026-09-22).** The
+expected results below apply to it: everything except **cloud voice** must
+work; cloud Bixby/fresh voice search is intentionally broken. Under mlock, any
+Samsung hostname that is not on the documented keep list (SAMSUNG_ALLOWED_EGRESS.md)
+is also denied + logged — if a test fails, check
+`sudo scripts/show-unknown-samsung.sh 24` for a newly-denied Samsung host and
+`sudo scripts/manufacturer-review.sh keep <domain> "reason"` if it is essential.
+
 Run these tests in order **after** you have enabled a profile and
 `sudo scripts/privacy-live-check.sh` has passed. The server cannot click the TV;
 these are the physical steps. For each test: what you do, what counts as PASS,
@@ -136,8 +144,10 @@ Run the scientific version (one command + the three questions below):
 - **If a cloud answer still works:** do not disable — re-run the proof
   capture and report the capture directory; it shows exactly which
   destination slipped through for the next iteration. Also check
-  `sudo scripts/privacy-policy-status.sh` (expect 38 group entries incl. the
-  regex) and `sudo dmesg | grep TVGUARD-PRIVACY` (drops to the aibixby IPs
+  `sudo scripts/privacy-policy-status.sh` (under manufacturer-lockdown expect
+  70 group entries: 37 exact + 14 regex + 19 allow; under
+  standard-no-voice: 38 incl. the aibixby regex) and
+  `sudo dmesg | grep TVGUARD-PRIVACY` (drops to the aibixby IPs
   while you try voice).
 - **Diagnose:** `show-dns-activity.py` should show the aibixby domains
   returning blocked; `dmesg` should show `TVGUARD-PRIVACY DST=<aibixby IP>`
@@ -153,6 +163,7 @@ Run the scientific version (one command + the three questions below):
    `python3 scripts/show-dns-activity.py 192.168.0.197` (blocked entries) —
    report it; if the keep decision is right it goes into
    `config/privacy-keep.yaml` and the policy is re-applied.
-3. `sudo scripts/privacy-policy-apply.sh standard-no-voice`
-   `sudo scripts/privacy-reset-tv-voice-state.sh`   (expire stale voice flows; per-TV only)
+3. Re-apply the active profile:
+   `sudo scripts/privacy-policy-apply.sh manufacturer-lockdown`
+   `sudo scripts/privacy-reset-tv-manufacturer-state.sh`   (expire stale flows to denied mlock IPs; per-TV only)
    `sudo scripts/privacy-watch.sh 30 --auto-rollback`

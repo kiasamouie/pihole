@@ -1,4 +1,30 @@
-# Enabling `standard-no-voice` on the Samsung — exact steps
+# Enabling the privacy policy on the Samsung — exact steps
+
+**Current state (2026-09-22): `manufacturer-lockdown` is ALREADY LIVE** on
+192.168.0.197. If you are re-enabling after a rollback, the recommended
+profile is `manufacturer-lockdown` (this section); `standard-no-voice`
+remains documented below for reference.
+
+## Enabling `manufacturer-lockdown` (recommended — what is live)
+
+From a clean baseline (policy off):
+
+```bash
+cd /home/kia/dns
+sudo scripts/privacy-policy-apply.sh manufacturer-lockdown   # re-resolves + re-renders + re-pushes (idempotent)
+sudo scripts/privacy-reset-tv-manufacturer-state.sh --flush-dns-cache  # expire stale .197 flows to denied mlock IPs + flush Pi-hole DNS cache (per-TV only)
+sudo scripts/privacy-live-check.sh                           # must show 10/10 PASS incl. the two scope lines
+sudo scripts/privacy-watch.sh 30 --auto-rollback             # 30-minute safety watch (separate terminal)
+```
+
+Expected: `tv_privacy` set = {192.168.0.197} only (Google TV unaffected);
+group TVGuard-Privacy = 70 rows (37 exact + 14 regex + 19 allow); 166 deny IPs
+in the firewall; no rule touches 443/UDP-443; unknown Samsung hosts denied +
+logged (review: `sudo scripts/show-unknown-samsung.sh 24`).
+
+---
+
+# Enabling `standard-no-voice` (reference) — exact steps
 
 Starting position: you are sitting at your computer. The Samsung is already
 configured with:

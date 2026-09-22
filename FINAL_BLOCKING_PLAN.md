@@ -1,18 +1,18 @@
 # FINAL BLOCKING PLAN — Samsung QE65Q75CATXXU (192.168.0.197)
 
-**State: READY, NOT ACTIVE.** No privacy blocking is currently enabled.
-Everything below is researched, generated, syntax-tested (netns + throwaway
-table), Pi-hole-API-tested (temporary group, fully cleaned), and rollback-tested.
-
-Activation is ONE explicit action by you:
+**State: ACTIVE — `manufacturer-lockdown`** (applied 2026-09-22 10:54Z,
+Samsung .197 only). All profiles below are researched, generated,
+syntax-tested (netns + throwaway table), Pi-hole-API-tested (temporary group,
+fully cleaned), and rollback-tested.
 
 ```
-sudo scripts/privacy-policy-apply.sh standard            # ACR + ads + high-conf telemetry + DoT
-sudo scripts/privacy-policy-apply.sh standard-no-voice   # + confirmed Bixby/voice cloud (RECOMMENDED)
-sudo scripts/privacy-policy-apply.sh strict              # + low-conf telemetry + DoH-IP set
-sudo scripts/privacy-policy-disable.sh                   # full privacy rollback (one command)
-sudo scripts/privacy-live-check.sh                       # post-enable verification
-sudo scripts/privacy-watch.sh 30 --auto-rollback         # 30-min safety watch
+sudo scripts/privacy-policy-apply.sh standard              # ACR + ads + high-conf telemetry + DoT
+sudo scripts/privacy-policy-apply.sh standard-no-voice     # + confirmed Bixby/voice cloud
+sudo scripts/privacy-policy-apply.sh strict                # + low-conf telemetry + DoH-IP set
+sudo scripts/privacy-policy-apply.sh manufacturer-lockdown # + Samsung deny-by-default (RECOMMENDED; LIVE)
+sudo scripts/privacy-policy-disable.sh                     # full privacy rollback (one command)
+sudo scripts/privacy-live-check.sh                         # post-enable verification
+sudo scripts/privacy-watch.sh 30 --auto-rollback           # 30-min safety watch
 ```
 
 ## 0. How enforcement works (two layers, same source of truth)
@@ -25,10 +25,19 @@ ephemeral IPs, re-resolved on every apply).
 Profiles (per-entry `tiers:` lists, one source of truth):
 
 ```
-standard            = tiers include "standard"
-standard-no-voice   = tiers include "standard" OR "voice"   (= standard + voice)
-strict              = ALL entries (superset) + DoH endpoint IP set
+standard              = tiers include "standard"
+standard-no-voice     = tiers include "standard" OR "voice"   (= standard + voice)
+strict                = ALL entries (superset) + DoH endpoint IP set
+manufacturer-lockdown = standard-no-voice + 13 deny-by-default Samsung zone regexes
+                        + 19 documented keep rows (keep wins)   [RECOMMENDED, LIVE]
 ```
+
+`manufacturer-lockdown` is defined in `config/manufacturer.yaml` (zones) +
+`config/manufacturer-keep.yaml` (allow-list); see
+`reports/10-manufacturer-lockdown.md` and `SAMSUNG_ALLOWED_EGRESS.md` /
+`SAMSUNG_BLOCKED_EGRESS.md`. Privacy firewall rules are scoped to the
+`applies_to` list via a dedicated `tv_privacy` set — the Google TV (.90) is
+NOT affected by any privacy rule.
 
 | Layer | What it does | Scope |
 |-------|--------------|-------|
@@ -190,6 +199,50 @@ updates, Prime Video, app store, normal HTTPS (TCP 443 untouched).
 
 No rule touches: TCP/443 (blanket), UDP/443 (QUIC stays free), LAN traffic
 (Plex/casting/discovery), other devices (policy scoped to .197 only).
+
+## 4b. MANUFACTURER-LOCKDOWN (the recommended, LIVE profile)
+
+Semantics: non-Samsung internet services work normally; **Samsung/manufacturer
+egress is deny-by-default unless explicitly classified as essential.**
+
+```
+manufacturer-lockdown
+  = standard-no-voice (37 exact + aibixby regex, as in §1b)
+  + 13 deny-by-default Samsung zone regexes (config/manufacturer.yaml):
+      samsungacr.com, samsungads.com, samsungcloud.tv, samsungcloud.com,
+      samsungcloudcdn.com, samsungcloudsolution.com, samsungcloudsolution.net,
+      samsungotn.net, samsungnyc.com, samsung.com, samsungosp.com,
+      bixbyllm.com, sbixby.com
+  + 19 documented keep rows (config/manufacturer-keep.yaml) — KEEP WINS
+    (group-scoped Pi-hole allow rows; FTL allow beats deny)
+  + resolved-IP firewall deny set (166 IPs as of 2026-09-22; re-resolved per apply)
+  + unknown-Samsung logging → data/manufacturer-unknown/ (review:
+    scripts/show-unknown-samsung.sh, scripts/manufacturer-review.sh keep|block)
+```
+
+MANUFACTURER-LOCKDOWN WILL BLOCK:
+
+- everything in §1b (ACR, ads, high-confidence telemetry, Bixby/voice),
+- any future Samsung host inside the 13 zones that is not on the keep list
+  (denied + logged until reviewed),
+- external :53 and DoT 853 (scoped to the Samsung only).
+
+MANUFACTURER-LOCKDOWN WILL NOT BLOCK:
+
+- the 19 keep hosts (time/cdn/lcprd1/configprd/otnprd*/www.samsungotn/otn.
+  samsungcloudcdn/play/api/auth/eu-auth2/gld.push/tvpnlinupepgpeu/fc/
+  multiscreen/img-resize-cdn-prod),
+- the whole `*.samsungqbe.com` family (Perflyst #82 breakage evidence),
+- all non-Samsung infrastructure (YouTube, Google video/CDN, Netflix, Prime,
+  Plex, CloudFront/AWS, casting, QUIC, ordinary HTTPS),
+- the strict-only low-confidence telemetry (nmetrics/smetrics/…) and the
+  DoH-IP enforcement set (not inherited).
+
+Live state (2026-09-22): group TVGuard-Privacy = 70 rows (37 exact + 14
+regex + 19 allow), client 192.168.0.197 only; `tv_privacy_blocked` = 166 IPs;
+`tv_privacy` scope set = {192.168.0.197}; UFW/Docker/NAT untouched.
+Rollback: `sudo scripts/privacy-policy-disable.sh` (removes all 70 rows
+including the allows, the deny sets and the DoT rules; keeps the gateway).
 
 ## 5. STRICT ADDITIONS (strict = standard + 16 domains + DoH-IP set)
 
