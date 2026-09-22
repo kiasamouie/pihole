@@ -2,7 +2,7 @@
 #
 # privacy-live-check.sh - verify a privacy policy that has been ENABLED.
 #
-# Run AFTER:  sudo scripts/privacy-policy-apply.sh standard|standard-no-voice|strict
+# Run AFTER:  sudo scripts/privacy-policy-apply.sh standard|standard-no-voice|strict|manufacturer-lockdown
 #
 # It checks everything that can be checked from the server side and ends with
 # the list of physical TV tests only YOU can perform (it cannot click the TV).
@@ -42,6 +42,36 @@ echo "$T" | grep -q "masquerade" && ok "NAT/masquerade intact" || no "masquerade
 echo "$T" | grep -q "dport 53 dnat" && ok "DNS-bypass DNAT intact" || no "DNS DNAT missing - check TVGuard!"
 N=$(echo "$T" | sed -n '/set tv_privacy_blocked/,/}/p' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -u | wc -l)
 echo "  deny-IP count in firewall: $N"
+# Scope check: privacy/DoT/DNS-forcing rules must match ONLY the policy's
+# applies_to list (tv_privacy set), never the full tvs set (which may
+# include other TVs like the Google TV .90).
+if echo "$T" | grep -q 'set tv_privacy {'; then
+  SCOPE_EXPECT=$(python3 -c '
+targets, in_list = [], False
+for line in open(__import__("sys").argv[1]):
+    s = line.strip()
+    if s.startswith("applies_to:"):
+        in_list = True; continue
+    if in_list:
+        if s.startswith("- "):
+            item = s[2:].split("#", 1)[0].strip().strip(chr(34))
+            if item:
+                targets.append(item)
+        elif s and not s.startswith("#"):
+            in_list = False
+print(" ".join(sorted(targets)))
+' "$ROOT/config/privacy-policy.yaml" 2>/dev/null)
+  SCOPE_ACTUAL=$(echo "$T" | sed -n '/set tv_privacy {/,/}/p' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -u | tr '\n' ' ' | sed 's/[[:space:]]*//g')
+  SCOPE_EXPECT_NORM=$(echo "$SCOPE_EXPECT" | sed 's/[[:space:]]*//g')
+  [ "$SCOPE_ACTUAL" = "$SCOPE_EXPECT_NORM" ] \
+    && ok "tv_privacy scope = applies_to only ($SCOPE_ACTUAL) - other household clients unaffected by the privacy layer" \
+    || no "tv_privacy scope mismatch: set={$SCOPE_ACTUAL} vs applies_to={$SCOPE_EXPECT_NORM}"
+else
+  no "tv_privacy scope set missing (privacy rules not scoped to applies_to)"
+fi
+BADSCOPE=$(echo "$T" | grep -E 'ip saddr @tvs' | grep -E 'tv_privacy_blocked|dport 853|dport 53' | wc -l)
+[ "$BADSCOPE" -eq 0 ] && ok "no privacy/DoT/DNS-forcing rule matches the full tvs set" \
+  || no "$BADSCOPE rule(s) still match @tvs for privacy/DoT/DNS-forcing - other TVs would be affected"
 
 echo
 echo "=== 2. Pi-hole layer ==="
@@ -91,9 +121,18 @@ if not rx:
 else:
     rx_missing = [r["pattern"] for r in rx if r["pattern"] not in mine_names]
     if rx_missing:
-        print("  WARN: %d regex denies not found in group: %s" % (len(rx_missing), ", ".join(rx_missing)))
+        print("  WARN: %d regex denies not found in group: %s" % (len(rx_missing), ", ".join(rx_missing[:5])))
     else:
-        print("  PASS: all %d regex (suffix-family) denies present in group" % len(rx))
+        print("  PASS: all %d regex (suffix/zone-family) denies present in group" % len(rx))
+allows = resolved[TIER].get("allows") or []
+if allows:
+    allow_missing = [a for a in allows if a.lower() not in {m.lower() for m in mine_names}]
+    if allow_missing:
+        print("  WARN: %d allow rows missing from group (may pre-exist globally): %s" % (len(allow_missing), ", ".join(allow_missing[:5])))
+    else:
+        print("  PASS: all %d allow rows present in group (keep wins)" % len(allows))
+else:
+    print("  (no allow rows in this tier)")
 PYEOF
 
 echo
@@ -128,6 +167,10 @@ if [ "$PRIVACY" = "standard" ]; then
   echo "  6. (standard) voice search: should still work - confirm one command"
 else
   echo "  6. ($PRIVACY) voice: expected NOT to work (intended Bixby/voice-cloud block) - confirm everything else works"
+fi
+if [ "$PRIVACY" = "manufacturer-lockdown" ]; then
+  echo "  7. Unknown Samsung denies: sudo scripts/show-unknown-samsung.sh 24"
+  echo "     then decide each one: sudo scripts/manufacturer-review.sh keep|block <domain> [reason]"
 fi
 echo
 echo "If anything breaks: sudo scripts/privacy-policy-disable.sh (one command, full privacy rollback)"

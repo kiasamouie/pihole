@@ -1,0 +1,265 @@
+#
+# research/samsung-ownership.yaml - Samsung ownership & service classification
+# for the manufacturer-lockdown policy.
+#
+# Evidence snapshot date: 2026-09-21 (all RDAP fetched today via rdap.org /
+# direct registry RDAP; CT via crt.sh today; community lists per snapshots in
+# research/github/; local = our own captures in reports/06 + captures/).
+#
+# Evidence keys (files):
+#   rdap                      research/tmp/rdap-<zone>.json + rdap-summary.txt (2026-09-21)
+#   crtsh-<zone>              research/tmp/crtsh-<zone>-names.txt (2026-09-21)
+#   voice-resolve             research/tmp/voice-resolve.txt (RDNS/CNAME chains, 2026-09-21)
+#   voice-ip-ownership        research/tmp/voice-ip-ownership.txt (ipinfo.io, 2026-09-21)
+#   perflyst / fightback / hagezi / marq24
+#                             research/github/snapshots/* (maintained community lists)
+#   safenetiot-imc2024        "Watching TV with the Second-Party" (ACR endpoints incl.
+#                             acr-*-prd.samsungcloud.tv, samsungacr.com log planes)
+#   local-capture             our TV DNS/flow captures (reports/06, captures/)
+#   perflyst-82               documented Samsung QBE breakage (issue #82)
+#
+# NOTE ON REGISTRANTS: registry RDAP (Verisign and others) no longer publishes
+# registrant entity names for these zones (all REDACTED). Ownership is therefore
+# established by: (a) delegation to Samsung-controlled / Samsung-brand nameservers
+# where present, (b) CNAME/RDNS chains into Samsung-branded infrastructure,
+# (c) CT logs (certificates issued for the zones), (d) the zone's exclusively
+# Samsung service population (CT + our captures + maintained lists). This is
+# recorded per zone below - do not overclaim a registrant string.
+#
+# action values:
+#   deny-default   zone is deny-by-default under manufacturer-lockdown
+#   deny           explicit deny (already in config/privacy-policy.yaml tiers)
+#   allow          essential (in config/manufacturer-keep.yaml)
+#   keep-family    whole family stays allowed (documented breakage / dynamic infra)
+#
+zones:
+
+  - domain: samsungacr.com
+    owner: Samsung (registry-redacted; service population is exclusively Samsung ACR)
+    ownership_confidence: high
+    service: "ACR / viewing-history telemetry, dedicated zone"
+    essential_for_normal_apps: false
+    privacy_class: acr
+    action: deny-default
+    evidence:
+      rdap: "registered, redacted (rdap-<zone>.json)"
+      crtsh: "102 certs, ap/eu/na/sa log planes + www.logs + internal families"
+      safenetiot: "log-config / log-ingestion / log-N families named in the ACR paper"
+      local-capture: "log-ingestion-eu, log-config, log-1..3 observed from this TV"
+    sources: [rdap, crtsh-samsungacr, safenetiot-imc2024, perflyst, fightback, local-capture]
+
+  - domain: samsungads.com
+    owner: Samsung (registry-redacted; ad service population)
+    ownership_confidence: high
+    service: "Samsung advertising platform"
+    essential_for_normal_apps: false
+    privacy_class: ads
+    action: deny-default
+    evidence:
+      crtsh: "ad service hostnames"
+      local-capture: "rtb-config.samsungads.com, tvp-ads-log.samsungads.com observed"
+      lists: "ads.samsungads.com in perflyst/fightback/marq24"
+    sources: [rdap, crtsh, local-capture, perflyst, fightback]
+
+  - domain: samsungcloud.tv
+    owner: Samsung (registered 2017-05-10 via Whois Corp./YesNIC, Seoul KR;
+      expires 2027-05-10; status client-transfer-prohibited; NS = AWS Route 53 quad;
+      live child hosts: EPG -> CloudFront, acr-eu-prd -> AWS EC2. An earlier RDAP
+      404 on 2026-09-21 was an endpoint quirk - the .tv registry RDAP returns a
+      full 200 object.)
+    ownership_confidence: high
+    service: "mixed Samsung TV cloud: ACR (acr-*-prd), QoE telemetry (qoe), TV Plus EPG"
+    essential_for_normal_apps: partial   # TV Plus EPG hosts are essential (keep)
+    privacy_class: mixed
+    action: deny-default
+    keep_hosts: [tvpnlinupepgpeu.samsungcloud.tv, fc.samsungcloud.tv]
+    evidence:
+      safenetiot: "acr-eu-prd / acr-us-prd / regional acr-*-prd.samsungcloud.tv are the ACR paper's endpoint family"
+      local-capture: "tvpnlinupepgpeu + fc = heaviest Samsung domains observed; acr-eu-prd observed"
+      pihole: "qoe.samsungcloud.tv in local-capture (telemetry)"
+    sources: [rdap, safenetiot-imc2024, local-capture, perflyst]
+
+  - domain: samsungcloud.com
+    owner: Samsung (registry-redacted)
+    ownership_confidence: high
+    service: "Samsung app/cloud platform"
+    essential_for_normal_apps: partial   # play. + api. are essential (keep)
+    privacy_class: mixed
+    action: deny-default
+    keep_hosts: [play.samsungcloud.com, api.samsungcloud.com]
+    evidence:
+      local-capture: "play.samsungcloud.com, api.samsungcloud.com observed"
+      rdap: "registered via Whois Corp. (Korean registrar), Route 53 NS"
+    sources: [rdap, local-capture]
+
+  - domain: samsungcloudcdn.com
+    owner: Samsung (registry-redacted)
+    ownership_confidence: high
+    service: "Samsung CDN / OTA"
+    essential_for_normal_apps: partial   # otn. is essential (keep)
+    privacy_class: mixed
+    action: deny-default
+    keep_hosts: [otn.samsungcloudcdn.com]
+    evidence:
+      perflyst: "#otn.samsungcloudcdn.com # Prevents updates on UE49KS7000 and QE55Q9FNA (issue #60)"
+      rdap: "registered via Whois Corp."
+    sources: [rdap, perflyst]
+
+  - domain: samsungcloudsolution.com
+    owner: Samsung (registry-redacted)
+    ownership_confidence: high
+    service: "Samsung TV platform: time sync, CDN, notices, error dumps, misc"
+    essential_for_normal_apps: partial   # time. + cdn. are essential (keep)
+    privacy_class: mixed
+    action: deny-default
+    keep_hosts: [time.samsungcloudsolution.com, cdn.samsungcloudsolution.com]
+    evidence:
+      perflyst: "#time.samsungcloudsolution.com # if blocked, services like Plex, YouTube and Amazon Video not working anymore"
+      perflyst: "#cdn.samsungcloudsolution.com # System update check (observed keep)"
+      local-capture: "time. + cdn. observed; prderrordumphsm/notice*/oempprd/fkp/vdterms/prov/sas observed (telemetry, in strict tier)"
+    sources: [rdap, perflyst, local-capture, fightback]
+
+  - domain: samsungcloudsolution.net
+    owner: Samsung (registry-redacted)
+    ownership_confidence: high
+    service: "Samsung TV platform .net twin: config, OTA, device logging"
+    essential_for_normal_apps: partial   # lcprd1/configprd/otnprd* are essential (keep)
+    privacy_class: mixed
+    action: deny-default
+    keep_hosts: [lcprd1.samsungcloudsolution.net, configprd.samsungcloudsolution.net,
+                 otnprd8.samsungcloudsolution.net, otnprd9.samsungcloudsolution.net,
+                 otnprd10.samsungcloudsolution.net, otnprd11.samsungcloudsolution.net]
+    evidence:
+      perflyst: "#lcprd1 (ping test, no beaconing); #otnprd10/11/8/9 required for software update"
+      local-capture: "lcprd1 = persistent 100k+ packet flow from this TV"
+    sources: [rdap, perflyst, local-capture]
+
+  - domain: samsungotn.net
+    owner: Samsung (registry-redacted; whois.co.kr registrar, Samsung NS delegation)
+    ownership_confidence: high
+    service: "OTA / firmware update"
+    essential_for_normal_apps: partial   # www. is essential (keep)
+    privacy_class: mixed
+    action: deny-default
+    keep_hosts: [www.samsungotn.net]
+    evidence:
+      perflyst: "#www.samsungotn.net # required for software update"
+      rdap: "Whois Corp. (Korean registrar)"
+    sources: [rdap, perflyst]
+
+  - domain: samsungnyc.com
+    owner: Samsung (registry-redacted)
+    ownership_confidence: high
+    service: "Samsung New York media/image CDN"
+    essential_for_normal_apps: partial   # img-resize-cdn-prod. is essential (keep)
+    privacy_class: mixed
+    action: deny-default
+    keep_hosts: [img-resize-cdn-prod.samsungnyc.com]
+    evidence:
+      local-capture: "img-resize-cdn-prod.samsungnyc.com observed (app/EPG imagery)"
+    sources: [rdap, local-capture]
+
+  - domain: samsung.com
+    owner: Samsung (registry-redacted; whois.co.kr registrar, Samsung-related registry link)
+    ownership_confidence: high
+    service: "Samsung corporate + TV services (multiscreen/cast, metrics, openapi)"
+    essential_for_normal_apps: partial   # multiscreen. is essential (keep)
+    privacy_class: mixed
+    action: deny-default
+    keep_hosts: [multiscreen.samsung.com]
+    evidence:
+      perflyst: "nmetrics/smetrics/event-tracking listed by fightback (telemetry); #multiscreen.samsung.com whitelisted by notracking"
+      local-capture: "multiscreen.samsung.com used for cast/multi-screen"
+    sources: [rdap, fightback, perflyst, local-capture]
+
+  - domain: samsungosp.com
+    owner: Samsung (registry-redacted)
+    ownership_confidence: high
+    service: "Samsung account auth + push"
+    essential_for_normal_apps: partial   # auth/gld.push/eu-auth2 are essential (keep)
+    privacy_class: mixed
+    action: deny-default
+    keep_hosts: [auth.samsungosp.com, gld.push.samsungosp.com, eu-auth2.samsungosp.com]
+    evidence:
+      perflyst: "#auth.samsungosp.com # if blocked, samsung accounts will fail to authenticate"
+      local-capture: "gld.push observed; auth + eu-auth2 observed during account sign-in"
+    sources: [rdap, perflyst, local-capture]
+
+  - domain: bixbyllm.com
+    owner: Samsung (registry-redacted; Bixby LLM / Samsung Cloud Service hosts)
+    ownership_confidence: high
+    service: "Bixby LLM (Samsung Intelligence Service) - Galaxy/TV AI backend"
+    essential_for_normal_apps: false
+    privacy_class: voice
+    action: deny-default
+    evidence:
+      crtsh: "gke-scs-gatekeeper-usc1.bixbyllm.com, scs-gatekeeper-use2.bixbyllm.com (GKE hosting)"
+      voice-resolve: "scs-use2.bixbyllm.com -> gke-scs-usc1.bixbyllm.com (CNAME chain)"
+      hagezi: "2026 HaGeZi issue reports scs-use2.bixbyllm.com from Samsung Intelligence Service"
+      local-capture: "none observed on this TV (no TV-side evidence yet; deny-by-default is the safe default)"
+    sources: [rdap, crtsh, voice-resolve, hagezi]
+
+  - domain: sbixby.com
+    owner: Samsung (registry-redacted; Whois Corp. Korean registrar)
+    ownership_confidence: high
+    service: "Bixby (sbixby = Samsung Bixby) voice/AI plane"
+    essential_for_normal_apps: false
+    privacy_class: voice
+    action: deny-default
+    evidence:
+      crtsh: "*.sbixby.com, *.rb.sbixby.com, rb.sbixby.com, *.bixby-cloud-cp.sbixby.com"
+      rdap: "Whois Corp. (Korean registrar)"
+      local-capture: "none observed on this TV (deny-by-default is the safe default)"
+    sources: [rdap, crtsh]
+
+  # --- NOT deny-default zones -------------------------------------------------
+
+  - domain: aibixby.com
+    owner: Samsung (registry-redacted; Route 53 NS)
+    ownership_confidence: high
+    service: "Bixby voice/cloud plane (user, mgmt, llm, kgs, oauth, partners)"
+    essential_for_normal_apps: false
+    privacy_class: voice
+    action: deny
+    note: "Already covered by the existing voice tier: the *.aibixby.com suffix
+      regex (config/privacy-policy.yaml, voice section) is in every voice-carrying
+      profile including manufacturer-lockdown. Not repeated in manufacturer.yaml
+      to avoid a double control on the same zone."
+    evidence:
+      crtsh: "80 unique names, all Bixby infrastructure (bixby2-user, bixby3-user, llm, kgs, oauth, partners, tgi)"
+      voice-resolve: "prdcore1-euw1-user.aibixby.com -> k8s ingress ELB eu-west-1 (AWS)"
+      local-capture: "prd-euw1-ucs, provisioning-use2, prdcore1-euw1-user observed"
+    sources: [rdap, crtsh, voice-resolve, local-capture]
+
+  - domain: samsungqbe.com
+    owner: Samsung (registry-redacted)
+    ownership_confidence: high
+    service: "Samsung app-store/QBE dynamic app infrastructure (osb-*, gpm, sastv)"
+    essential_for_normal_apps: true
+    privacy_class: essential
+    action: keep-family
+    note: "NOT a deny-default zone. Hosts are dynamic (osb-<svc>-v2-<region>);
+      documented breakage if blocked. Family stays fully allowed; individual hosts
+      remain protected by config/privacy-keep.yaml."
+    evidence:
+      perflyst-82: "issue #82: blocking QBE hosts broke YouTube/Prime/app launch; '#gpm.samsungqbe.com # Numerous connection problems'; '#osb-ussvc ... required for TV Plus'"
+      local-capture: "osb-v2 (16-17 hits), osb-eusvc-v2, osb-mc-v2 observed"
+    sources: [rdap, perflyst-82, known-breakage.yaml, local-capture]
+
+  - domain: samsungadhub.com
+    owner: "NOT currently Samsung-owned: registry shows DropCatch.com 936 LLC
+      (drop-catcher) with Namebright 'expired' parking nameservers (2026-09-21 RDAP) -
+      a lapsed domain that was dropped and re-registered by a drop-catcher"
+    ownership_confidence: high   # (that it is NOT currently Samsung-controlled)
+    service: "was: Samsung AdHub ads; currently: expired/parked"
+    essential_for_normal_apps: false
+    privacy_class: ads
+    action: deny
+    note: "Kept as an EXPLICIT deny (advertising tier in config/privacy-policy.yaml)
+      because the names (ad.samsungadhub.com, rd.samsungadhub.com) were observed on
+      this TV and the zone is parked - blocking it is harmless. It is deliberately
+      NOT a deny-default zone: deny-by-default semantics require Samsung ownership."
+    evidence:
+      rdap: "registrar=DropCatch.com 936 LLC; NS=expired1/2.namebrightdns.com"
+      local-capture: "ad.samsungadhub.com, rd.samsungadhub.com observed (historical)"
+    sources: [rdap, local-capture, perflyst, marq24]

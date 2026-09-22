@@ -55,7 +55,16 @@ else:
     gid = groups[GROUP_NAME]
     rows = req("GET", "/api/domains?limit=100", None, sid).get("domains", [])
     mine = [d for d in rows if gid in (d.get("groupIDs") or d.get("groups") or [])]
-    print("group id: %d | domains in group: %d" % (gid, len(mine)))
+    mine_types = {}
+    for d in mine:
+        mine_types[(d.get("type", "deny"), d.get("kind", "exact"))] = mine_types.get((d.get("type", "deny"), d.get("kind", "exact")), 0) + 1
+    print("group id: %d | rows in group: %d | %s" % (gid, len(mine),
+          ", ".join("%d %s-%s" % (n, t, k) for (t, k), n in sorted(mine_types.items()))))
+    allows = sorted(d["domain"] for d in mine if d.get("type") == "allow")
+    if allows:
+        print("  allow rows (keep wins):")
+        for a in allows:
+            print("    allow %s" % a)
     for c in req("GET", "/api/clients", None, sid).get("clients", []):
         if gid in c.get("groups", []):
             print("  attached client: %s" % (c.get("client") or c.get("ip")))
@@ -65,5 +74,5 @@ echo
 echo "=== TVGuard base state ==="
 grep -E '^MODE=' "$STATE_DIR/state" 2>/dev/null || echo "(no tvguard state)"
 echo
-echo "Run 'sudo scripts/privacy-policy-apply.sh standard|strict' to enable,"
+echo "Run 'sudo scripts/privacy-policy-apply.sh standard|standard-no-voice|strict|manufacturer-lockdown' to enable,"
 echo "'sudo scripts/privacy-policy-disable.sh' to remove the privacy layer."

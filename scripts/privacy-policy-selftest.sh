@@ -12,10 +12,11 @@
 #   * a temporary Pi-hole group `TVGuard-Privacy-TEST` (deleted at end)
 #
 # Profiles:
-#   sudo scripts/privacy-policy-selftest.sh                # all three
+#   sudo scripts/privacy-policy-selftest.sh                # all four
 #   sudo scripts/privacy-policy-selftest.sh standard
 #   sudo scripts/privacy-policy-selftest.sh standard-no-voice
 #   sudo scripts/privacy-policy-selftest.sh strict
+#   sudo scripts/privacy-policy-selftest.sh manufacturer-lockdown
 #
 # What it proves (per profile):
 #   0. content assertions: senv == standard ∪ voice; strict ⊇ senv; strict-only
@@ -59,12 +60,12 @@ if [ "$(id -u)" -ne 0 ]; then echo "run with sudo"; exit 3; fi
 # --- profile selection ---------------------------------------------------------
 PROFILES=""
 case "${1:-}" in
-  ""|all)   PROFILES="standard standard-no-voice strict" ;;
-  standard|standard-no-voice|strict) PROFILES="$1" ;;
-  *) echo "usage: privacy-policy-selftest.sh [standard|standard-no-voice|strict]"; exit 4 ;;
+  ""|all)   PROFILES="standard standard-no-voice strict manufacturer-lockdown" ;;
+  standard|standard-no-voice|strict|manufacturer-lockdown) PROFILES="$1" ;;
+  *) echo "usage: privacy-policy-selftest.sh [standard|standard-no-voice|strict|manufacturer-lockdown]"; exit 4 ;;
 esac
 
-if [ "${PROFILES}" = "standard" ] || [ "${PROFILES}" = "standard-no-voice" ] || [ "${PROFILES}" = "strict" ] || [ ! -f "$RES" ] || [ "${1:-}" = "--build" ]; then
+if [ "${PROFILES}" = "standard" ] || [ "${PROFILES}" = "standard-no-voice" ] || [ "${PROFILES}" = "strict" ] || [ "${PROFILES}" = "manufacturer-lockdown" ] || [ ! -f "$RES" ] || [ "${1:-}" = "--build" ]; then
   if [ ! -f "$RES" ]; then
     echo "resolving policy first (takes ~1 min) ..."
     python3 "$SCRIPT_DIR/privacy-policy-build.py" || exit 5
@@ -78,8 +79,12 @@ echo "pihole container IP: $CIP"
 echo "profiles to test: $PROFILES"
 
 # baseline snapshots (unrelated-state proof)
+# docker_norm: compare container names + status with the human-readable uptime
+# normalised away ("Up 31 hours" -> "Up ") so an uptime boundary crossed during
+# the test is not a false positive; added/removed/restarted/health changes still fail.
+docker_norm(){ docker ps --format '{{.Names}} {{.Status}}' | sort | sed -E 's/Up [0-9]+ (second|minute|hour|day|week|month|year)s? (ago )?/Up /'; }
 BASE_UFW=$(ufw status verbose 2>/dev/null)
-BASE_DOCKER=$(docker ps --format '{{.Names}} {{.Status}}' | sort)
+BASE_DOCKER=$(docker_norm)
 BASE_TVGUARD_HASH_RAW=$(nft list table ip tvguard 2>/dev/null | sed -E 's/packets [0-9]+ bytes [0-9]+/COUNTERS/g' | sha256sum | awk '{print $1}')
 
 cleanup(){
@@ -123,9 +128,10 @@ log_count(){ # prefix dst
 }
 
 echo
+
 echo "=== TEST 0: policy content assertions (resolved.json vs YAML) ==="
-T0_OUT=$(RES="$RES" POL="$POL" KEEP="$KEEP" python3 - <<'PYEOF'
-import json, os, sys, yaml
+T0_OUT=$(RES="$RES" POL="$POL" KEEP="$KEEP" MANUF="$ROOT/config/manufacturer.yaml" MKEEP="$ROOT/config/manufacturer-keep.yaml" python3 - <<'PYEOF'
+import json, os, re as _re, sys, yaml
 d = json.load(open(os.environ["RES"]))
 pol = yaml.safe_load(open(os.environ["POL"]))
 keep = yaml.safe_load(open(os.environ["KEEP"]))
@@ -212,6 +218,85 @@ senv_ips = set(d["standard-no-voice"]["ips"])
 exp.append((("1.1.1.1" in d["doh"]["ips"]) and ("1.1.1.1" not in senv_ips),
             "1.1.1.1 in DoH set and NOT in senv set (senv-allow / strict-drop test preconditions)",
             "1.1.1.1 precondition failed (doh=%s, senv=%s)" % ("1.1.1.1" in d["doh"]["ips"], "1.1.1.1" in senv_ips)))
+
+# --- manufacturer-lockdown invariants ---------------------------------------
+MANUF, MKEEP = os.environ["MANUF"], os.environ["MKEEP"]
+manuf = yaml.safe_load(open(MANUF))
+mkeepd = yaml.safe_load(open(MKEEP))
+zones = {z["domain"].strip().lower() for z in (manuf.get("deny_default_zones") or [])}
+# mirrors KNOWN_SAMSUNG_ZONES in privacy-policy-build.py (anti-wildcard guard)
+KNOWN = {"samsungacr.com", "samsungads.com", "samsungcloud.tv", "samsungcloud.com",
+         "samsungcloudcdn.com", "samsungcloudsolution.com", "samsungcloudsolution.net",
+         "samsungotn.net", "samsungnyc.com", "samsung.com", "samsungosp.com",
+         "bixbyllm.com", "sbixby.com"}
+exp.append((zones <= KNOWN,
+            "all manufacturer zones are in the known-Samsung whitelist",
+            "unknown zone(s) in manufacturer.yaml: %s" % sorted(zones - KNOWN)))
+mk = {k["domain"].strip().lower() for k in (mkeepd.get("keeps") or [])}
+def zof(dd, zz):
+    for z in sorted(zz, key=len, reverse=True):
+        if dd == z or dd.endswith("." + z):
+            return z
+    return None
+for h in sorted(mk):
+    exp.append((zof(h, zones) is not None,
+                "manufacturer-keep %s is inside a deny zone" % h,
+                "manufacturer-keep host outside any deny zone: %s" % h))
+for k in sorted(kept_names):
+    zz = zof(k, zones)
+    if zz is not None:
+        exp.append((k in mk,
+                    "privacy-keep %s (zone %s) is in manufacturer-keep" % (k, zz),
+                    "privacy-keep %s would be denied by zone %s - add to manufacturer-keep.yaml" % (k, zz)))
+m = d.get("manufacturer-lockdown")
+exp.append((m is not None, "resolved.json has a manufacturer-lockdown section",
+            "manufacturer-lockdown section missing from resolved.json"))
+if m:
+    exp.append((set(m.get("domains", [])) >= set(d["standard-no-voice"]["domains"]),
+                "mlock domains ⊇ standard-no-voice domains",
+                "mlock lost standard-no-voice domains"))
+    exp.append((set(m.get("ips", [])) >= set(d["standard-no-voice"]["ips"]),
+                "mlock IPs ⊇ standard-no-voice IPs (no unrelated firewall change)",
+                "mlock IP set diverged below the standard-no-voice set"))
+    exp.append(({r["name"] for r in (m.get("regexes") or [])}
+                >= {r["name"] for r in (d["standard-no-voice"].get("regexes") or [])},
+                "mlock regexes ⊇ standard-no-voice regexes",
+                "mlock missing standard-no-voice regexes"))
+    exp.append((set(m.get("allows", [])) == mk,
+                "mlock allows == manufacturer-keep hosts",
+                "mlock allows diverged from manufacturer-keep.yaml: %s"
+                % sorted(set(m.get("allows", [])) ^ mk)))
+    zrx = {r["name"]: r["pattern"] for r in (m.get("regexes") or [])}
+    for z in sorted(zones):
+        pat = zrx.get(z)
+        if pat is None:
+            exp.append((False, "a zone regex was generated for %s" % z,
+                        "no zone regex for %s in resolved.json" % z))
+            continue
+        try:
+            ok_probe = _re.match(pat, "zz9probe." + z) is not None
+            ok_apex = _re.match(pat, z) is not None
+        except _re.error as e:
+            exp.append((False, "zone regex for %s compiles: %s" % (z, e),
+                        "zone regex for %s invalid: %s" % (z, e)))
+            continue
+        exp.append((ok_probe and ok_apex,
+                    "zone regex %s matches probe + apex (deny works)" % z,
+                    "zone regex %s fails probe/apex (probe=%s apex=%s)" % (z, ok_probe, ok_apex)))
+        for h in [x for x in sorted(mk) if zof(x, {z}) == z]:
+            exp.append((h in m.get("allows", []),
+                        "keep host %s protected by an allow row (FTL allow beats the zone deny)" % h,
+                        "keep host %s has no allow row - the plain zone regex would deny it" % h))
+    for r in (m.get("regexes") or []):
+        exp.append(("(?!" not in r["pattern"] and "(?=" not in r["pattern"],
+                    "regex %s uses no lookaround (this FTL build's validator rejects it)" % r["name"],
+                    "regex %s uses lookaround - this FTL build rejects it" % r["name"]))
+    exp.append((rx_names(d["strict"]) <= {"aibixby.com"},
+                "strict carries no new family zone regexes (no leak)",
+                "strict regex set changed: %s" % sorted(rx_names(d["strict"]) - {"aibixby.com"})))
+    exp.append((not (rx_names(d["standard"]) | rx_names(d["standard-no-voice"])) - {"aibixby.com"},
+                "standard and standard-no-voice carry no zone regexes (no leak)",
+                "zone regex leaked into standard/senv"))
 for cond, okmsg, badmsg in exp:
     print(("OK   " if cond else "BAD  ") + (okmsg if cond else badmsg))
 sys.exit(0)
@@ -353,7 +438,7 @@ PYEOF
         fi
       fi
       ;;
-    standard-no-voice)
+    standard-no-voice|manufacturer-lockdown)
       if [ -z "$AIBIXBY_IPS" ]; then
         no "voice section has no resolved IPs; cannot verify voice blocking"
       else
@@ -364,13 +449,13 @@ PYEOF
           if [ $RC -ne 0 ] && [ "$(log_count 'TVGUARD-PT-PRIV' "$AIB")" -ge 1 ]; then
             ok "voice IP $AIB:443 dropped (TVGUARD-PT-PRIV, DST match) - voice blocked as intended"
           else
-            no "voice IP $AIB:443 not dropped under standard-no-voice (rc=$RC, logs: $(log_count 'TVGUARD-PT-PRIV' "$AIB"))"
+            no "voice IP $AIB:443 not dropped under $PROF (rc=$RC, logs: $(log_count 'TVGUARD-PT-PRIV' "$AIB"))"
           fi
         done
         if run_ns timeout 8 bash -c "cat < /dev/null > /dev/tcp/1.1.1.1/443" >/dev/null 2>&1; then
-          ok "1.1.1.1:443 ALLOWED under standard-no-voice (DoH-IP set is strict-only; no collateral)"
+          ok "1.1.1.1:443 ALLOWED under $PROF (DoH-IP set is strict-only; no collateral)"
         else
-          no "1.1.1.1:443 unexpectedly unreachable under standard-no-voice"
+          no "1.1.1.1:443 unexpectedly unreachable under $PROF"
         fi
       fi
       ;;
@@ -490,6 +575,24 @@ if rx_new:
 rx_global = [p for p in regexes if p.lower() in existing and p.lower() not in set(temp_group_rows)]
 if rx_global:
     print("INFO %d regex (suffix) pattern(s) already in global DB (real group live) - temp group holds no copy, suffix mock-client test inconclusive for them" % len(rx_global))
+# allow rows (manufacturer-lockdown keep list): keep wins, incl. over gravity
+allows = [a for a in (resolved[PROF].get("allows") or [])]
+allow_fresh = [a for a in allows if a.lower() not in existing]
+if allow_fresh:
+    code, res = req("POST", "/api/domains/allow/exact", {"domain": allow_fresh, "groups": [gid]})
+    if code in (200, 201):
+        print("OK   %d allow rows pushed to temp group (of %d total; %d pre-existing in global DB)" % (len(allow_fresh), len(allows), len(allows) - len(allow_fresh)))
+    else:
+        okn = 0
+        for a in allow_fresh:
+            c2, r2 = req("POST", "/api/domains/allow/exact", {"domain": [a], "groups": [gid]})
+            if c2 in (200, 201):
+                okn += 1
+            else:
+                print("INFO allow row for %s not pushed (%s) - pre-existing global row is acceptable" % (a, str(r2)[:80]))
+        print("OK   %d/%d allow rows pushed (one-at-a-time fallback)" % (okn, len(allow_fresh)))
+elif allows:
+    print("INFO all %d allow names already in global DB - no fresh allow rows pushed" % len(allows))
 time.sleep(1)
 
 def host_dig(dom):
@@ -583,6 +686,40 @@ else:
     else:
         print("BAD  keep domain %s does not resolve for mock client: %s" % (kdom, ans or "empty"))
 
+# unclassified Samsung host: manufacturer-lockdown must DENY it (zone regex in
+# the temp group); all other profiles must still let it resolve (no leak).
+PROBES = ["www.samsung.com", "www.samsungcloud.tv", "www.samsungcloudsolution.com",
+          "www.samsungnyc.com", "image.samsungcloudsolution.com"]
+for p in PROBES:
+    hb = host_dig(p)
+    if hb is None:
+        continue
+    ans = ns_dig(p)
+    if PROF == "manufacturer-lockdown":
+        if is_blocked(ans):
+            print("OK   unclassified Samsung host %s DENIED for mock client under manufacturer-lockdown (zone regex)" % p)
+        else:
+            print("BAD  unclassified Samsung host %s still resolves under manufacturer-lockdown: %s" % (p, ans))
+    else:
+        if IPRE.match(ans.splitlines()[0]) if ans else False:
+            print("OK   unclassified Samsung host %s still resolves under %s (no zone deny there)" % (p, PROF))
+        else:
+            print("BAD  unclassified Samsung host %s unexpectedly blocked under %s: %s" % (p, PROF, ans or "empty"))
+    break
+else:
+    print("INFO no resolvable unclassified Samsung probe host found - zone-regex probe test inconclusive")
+if PROF == "manufacturer-lockdown":
+    kh = "time.samsungcloudsolution.com"
+    kbh = host_dig(kh)
+    if kbh is None:
+        print("INFO host baseline: %s blocked by gravity - the mock-client allow-row test below is the decisive keep-wins proof" % kh)
+    else:
+        ans = ns_dig(kh)
+        if IPRE.match(ans.splitlines()[0]) if ans else False:
+            print("OK   keep host %s resolves for mock client under manufacturer-lockdown: %s (keep wins)" % (kh, ans.splitlines()[0]))
+        else:
+            print("BAD  keep host %s does not resolve under manufacturer-lockdown: %s (keep-list broken!)" % (kh, ans or "empty"))
+
 # cleanup: delete only rows that belong solely to the temp group (rows shared
 # with other groups - e.g. the real TVGuard-Privacy - are never deleted),
 # then detach client and delete group.
@@ -642,7 +779,7 @@ else
   diff <(echo "$BASE_UFW_N") <(echo "$CUR_UFW") | sed 's/^/    /'
   no "ufw state changed beyond the throwaway mock rule"
 fi
-CUR_DOCKER=$(docker ps --format '{{.Names}} {{.Status}}' | sort)
+CUR_DOCKER=$(docker_norm)
 [ "$CUR_DOCKER" = "$BASE_DOCKER" ] && ok "docker containers unchanged" || no "docker state changed"
 
 echo

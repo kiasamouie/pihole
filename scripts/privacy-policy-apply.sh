@@ -5,6 +5,7 @@
 #   sudo scripts/privacy-policy-apply.sh standard
 #   sudo scripts/privacy-policy-apply.sh standard-no-voice
 #   sudo scripts/privacy-policy-apply.sh strict
+#   sudo scripts/privacy-policy-apply.sh manufacturer-lockdown   (recommended)
 #
 # Testability overrides (documented, default to production values):
 #   PRIVACY_GROUP   Pi-hole group name (default: TVGuard-Privacy)
@@ -39,8 +40,8 @@ STATE_FILE="$STATE_DIR/privacy-state"
 
 TIER="${1:-}"
 case "$TIER" in
-  standard|standard-no-voice|strict) ;;
-  *) echo "usage: privacy-policy-apply.sh <standard|standard-no-voice|strict>" >&2; exit 4 ;;
+  standard|standard-no-voice|strict|manufacturer-lockdown) ;;
+  *) echo "usage: privacy-policy-apply.sh <standard|standard-no-voice|strict|manufacturer-lockdown>" >&2; exit 4 ;;
 esac
 
 PRIVACY_GROUP="${PRIVACY_GROUP:-TVGuard-Privacy}"
@@ -174,6 +175,28 @@ if rx_push:
     if code not in (200, 201):
         sys.exit("regex push failed: %s" % res)
 print("  pushed %d regex denies to %s (%d already present)" % (len(rx_push), GROUP_NAME, len(regexes) - len(rx_push)))
+# allow rows (manufacturer-lockdown keep list): keep wins - in FTL an allow
+# row for the client beats the group's zone-regex deny for that exact name
+# (proven by the selftest), and also shields the name against a
+# gravity/baseline block. Names already present in the global Pi-hole DB
+# cannot be re-added (4xx); those are skipped with a note.
+allows = [a for a in (resolved[TIER].get("allows") or [])]
+allow_fresh = [a for a in allows if a.lower() not in existing]
+if allow_fresh:
+    code, res = req("POST", "/api/domains/allow/exact", {"domain": allow_fresh, "groups": [gid]})
+    if code not in (200, 201):
+        pushed = 0
+        for a in allow_fresh:
+            code2, res2 = req("POST", "/api/domains/allow/exact", {"domain": [a], "groups": [gid]})
+            if code2 in (200, 201):
+                pushed += 1
+            else:
+                print("  WARN: allow row for %s not pushed: %s" % (a, str(res2)[:100]))
+        print("  pushed %d allow rows to %s (one-at-a-time fallback)" % (pushed, GROUP_NAME))
+    else:
+        print("  pushed %d allow rows to %s" % (len(allow_fresh), GROUP_NAME))
+if allows:
+    print("  allows total: %d (%d already in Pi-hole DB, skipped)" % (len(allows), len(allows) - len(allow_fresh)))
 PYEOF
 
 echo

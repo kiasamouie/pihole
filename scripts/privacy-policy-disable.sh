@@ -117,13 +117,15 @@ else:
 PYEOF
 
 echo
-"== verification =="
+echo "== verification =="
+# honour TGUARD_TABLE so mock/dry cycles can verify their own table
+NFT_TABLE="${TGUARD_TABLE:-tvguard}"
 # capture to a var first: `nft ... | grep -q` SIGPIPEs nft under set -o pipefail
-T=$(nft list table ip tvguard 2>/dev/null)
+T=$(nft list table ip "$NFT_TABLE" 2>/dev/null)
 if echo "$T" | grep -q "tv_privacy_blocked\|tv_doh_blocked"; then
-  echo "  WARN: privacy set still present in table ip tvguard" >&2
+  echo "  WARN: privacy set still present in table ip $NFT_TABLE" >&2
 else
-  echo "  OK: no privacy sets in table ip tvguard"
+  echo "  OK: no privacy sets in table ip $NFT_TABLE"
 fi
 if echo "$T" | grep -q masquerade; then
   echo "  OK: masquerade (NAT) still present - TV gateway path intact"

@@ -4,6 +4,9 @@
 #
 #   sudo scripts/privacy-watch.sh [minutes] [--auto-rollback]
 #
+# Works with every profile, incl. manufacturer-lockdown (for which it adds a
+# periodic "unknown Samsung egress" digest via show-unknown-samsung.sh).
+#
 # Samples every 60s:
 #   * Pi-hole: queries seen, blocked count, health
 #   * Samsung: active conntrack entries through this host (NAT path alive?)
@@ -110,6 +113,11 @@ PYEOF
     fi
   fi
 
+  if [ "$i" -ge "$DUR" ] && [ "$i" -gt 0 ] && [ $((i % 10)) -eq 0 ] && [ "$PRIVACY" = "manufacturer-lockdown" ]; then
+    echo "--- unknown Samsung egress digest (last 2h, denied-by-default) ---"
+    bash "$SCRIPT_DIR/show-unknown-samsung.sh" 2 2>/dev/null || echo "  (show-unknown-samsung unavailable this cycle)"
+  fi
+
   [ "$i" -ge "$DUR" ] && break
   sleep 60
 done
@@ -119,5 +127,7 @@ echo "watch finished: $(date -u +%H:%M:%S) UTC"
 echo
 echo "Review candidates (manual, from the Pi-hole UI):"
 echo "  * blocked queries per domain:  http://192.168.0.128:3001 (Queries tab)"
+echo "  * unknown Samsung (manufacturer-lockdown): sudo scripts/show-unknown-samsung.sh 24"
+echo "    then: sudo scripts/manufacturer-review.sh keep <domain> [reason]   (or: block <domain> [reason])"
 echo "  * if a function broke, find the failing domain in the query log and add it to"
 echo "    config/privacy-keep.yaml BEFORE re-enabling (keep-list wins over the policy)."

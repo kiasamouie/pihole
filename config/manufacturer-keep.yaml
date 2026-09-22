@@ -1,0 +1,169 @@
+#
+# manufacturer-keep.yaml - ESSENTIAL Samsung infrastructure for the
+# manufacturer-lockdown profile. KEEP WINS over the deny-by-default zones.
+#
+# Every host here:
+#   1. is pushed as a group-scoped Pi-hole ALLOW row - FTL allow beats deny,
+#      so the plain zone regex cannot block it (the FTL build's regex validator
+#      rejects lookaround, so there is no regex-side exemption); and
+#   2. shields the name against a gravity/baseline block of the same name.
+# Keep-wins is proven end-to-end by privacy-policy-selftest.sh (the keep host
+# must still resolve for the mock client under manufacturer-lockdown).
+#
+# Only hosts INSIDE a deny_default_zone (config/manufacturer.yaml) belong here;
+# the build fails otherwise. Sublabels of a kept host (e.g. x.time.…) are NOT
+# auto-allowed - if the TV ever needs one, allow it explicitly via
+#   scripts/manufacturer-review.sh keep <domain> [reason]
+#
+# Each entry documents WHY it stays allowed (no invisible allow decisions).
+#
+keeps:
+
+  # --- time / content delivery ------------------------------------------------
+  - domain: time.samsungcloudsolution.com
+    feature: "time sync"
+    reason: "Perflyst/fightback: blocking breaks Plex/YouTube/Prime Video on Samsung TVs"
+    evidence: "local-capture + perflyst comment (#time.samsungcloudsolution.com)"
+    sources: [local-capture, perflyst, fightback]
+    date: "2026-09-21"
+    confidence: high
+
+  - domain: cdn.samsungcloudsolution.com
+    feature: "content delivery / system update checks"
+    reason: "Perflyst comment: system update check; observed in local capture"
+    evidence: "perflyst comment (#cdn.samsungcloudsolution.com) + local-capture"
+    sources: [perflyst, local-capture]
+    date: "2026-09-21"
+    confidence: medium
+
+  # --- platform config / core service -----------------------------------------
+  - domain: lcprd1.samsungcloudsolution.net
+    feature: "platform core service"
+    reason: "fightback: blocking breaks Smart Hub; local evidence: persistent 100k+ packet flow from this TV"
+    evidence: "local-capture (samsung-observed-flow) + fightback"
+    sources: [local-capture, fightback]
+    date: "2026-09-21"
+    confidence: medium
+
+  - domain: configprd.samsungcloudsolution.net
+    feature: "platform config"
+    reason: "part of the documented do-not-block samsungcloudsolution.net family"
+    evidence: "fightback (configprd listed as keep context)"
+    sources: [fightback]
+    date: "2026-09-21"
+    confidence: medium
+
+  # --- OTA / firmware -----------------------------------------------------------
+  - domain: otnprd8.samsungcloudsolution.net
+    feature: "OTA update"
+    reason: "Perflyst comment: required for software update"
+    evidence: "perflyst comment (#otnprd10/11/8/9)"
+    sources: [perflyst]
+    date: "2026-09-21"
+    confidence: high
+  - domain: otnprd9.samsungcloudsolution.net
+    feature: "OTA update"
+    reason: "Perflyst comment: required for software update"
+    evidence: "perflyst comment (#otnprd10/11/8/9)"
+    sources: [perflyst]
+    date: "2026-09-21"
+    confidence: high
+  - domain: otnprd10.samsungcloudsolution.net
+    feature: "OTA update"
+    reason: "Perflyst comment: required for software update"
+    evidence: "perflyst comment (#otnprd10/11/8/9)"
+    sources: [perflyst]
+    date: "2026-09-21"
+    confidence: high
+  - domain: otnprd11.samsungcloudsolution.net
+    feature: "OTA update"
+    reason: "Perflyst comment: required for software update"
+    evidence: "perflyst comment (#otnprd10/11/8/9)"
+    sources: [perflyst]
+    date: "2026-09-21"
+    confidence: high
+  - domain: www.samsungotn.net
+    feature: "OTA update"
+    reason: "Perflyst comment: required for software update (QE65RU7455 class)"
+    evidence: "perflyst comment (#www.samsungotn.net)"
+    sources: [perflyst]
+    date: "2026-09-21"
+    confidence: high
+  - domain: otn.samsungcloudcdn.com
+    feature: "OTA update CDN"
+    reason: "Perflyst issue #60: blocking prevents firmware updates (UE49KS7000, QE55Q9FNA)"
+    evidence: "perflyst issue #60 comment"
+    sources: [perflyst]
+    date: "2026-09-21"
+    confidence: high
+
+  # --- app platform -------------------------------------------------------------
+  - domain: play.samsungcloud.com
+    feature: "Samsung app platform (Smart Hub / apps)"
+    reason: "observed in local capture; app platform endpoint"
+    evidence: "local-capture"
+    sources: [local-capture]
+    date: "2026-09-21"
+    confidence: medium
+  - domain: api.samsungcloud.com
+    feature: "Samsung cloud API"
+    reason: "observed in local capture; app platform API"
+    evidence: "local-capture"
+    sources: [local-capture]
+    date: "2026-09-21"
+    confidence: medium
+
+  # --- account auth / push ---------------------------------------------------------
+  - domain: auth.samsungosp.com
+    feature: "Samsung account authentication"
+    reason: "Perflyst comment: if blocked, Samsung accounts fail to authenticate"
+    evidence: "perflyst comment (#auth.samsungosp.com) + local-capture (sign-in)"
+    sources: [perflyst, local-capture]
+    date: "2026-09-21"
+    confidence: high
+  - domain: eu-auth2.samsungosp.com
+    feature: "Samsung account authentication (EU region)"
+    reason: "regional account-auth endpoint observed during account sign-in; blocking region peers of auth. breaks sign-in"
+    evidence: "local-capture (observed 2026-09-21 during account activity)"
+    sources: [local-capture]
+    date: "2026-09-21"
+    confidence: high
+  - domain: gld.push.samsungosp.com
+    feature: "Samsung push notifications"
+    reason: "observed in local capture; push channel for app notifications"
+    evidence: "local-capture + perflyst"
+    sources: [local-capture, perflyst]
+    date: "2026-09-21"
+    confidence: medium
+
+  # --- TV Plus / EPG -----------------------------------------------------------------
+  - domain: tvpnlinupepgpeu.samsungcloud.tv
+    feature: "Samsung TV Plus EPG (EU)"
+    reason: "heaviest domain in the unattended window; TV Plus content/EPG source (CloudFront)"
+    evidence: "local-capture (samsung-observed-flow) + dig (CNAME to CloudFront 2026-09-21)"
+    sources: [local-capture]
+    date: "2026-09-21"
+    confidence: high
+  - domain: fc.samsungcloud.tv
+    feature: "UNKNOWN purpose but heaviest Samsung domain observed"
+    reason: "never block an uncharacterised workhorse; CloudFront-backed; document privacy implication (content/feature channel we cannot yet classify)"
+    evidence: "local-capture (samsung-observed-flow) + dig (CNAME to CloudFront 2026-09-21)"
+    sources: [local-capture]
+    date: "2026-09-21"
+    confidence: low
+
+  # --- casting / imaging -----------------------------------------------------------------
+  - domain: multiscreen.samsung.com
+    feature: "Samsung Multi Screen (casting / remote)"
+    reason: "fightback/notracking whitelist: blocking breaks casting features"
+    evidence: "fightback + perflyst whitelist note"
+    sources: [fightback, perflyst]
+    date: "2026-09-21"
+    confidence: medium
+  - domain: img-resize-cdn-prod.samsungnyc.com
+    feature: "Samsung NY image CDN (app/EPG imagery)"
+    reason: "observed in local capture; imagery for UI/EPG"
+    evidence: "local-capture"
+    sources: [local-capture]
+    date: "2026-09-21"
+    confidence: medium

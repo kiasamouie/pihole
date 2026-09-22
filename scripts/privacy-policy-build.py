@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-privacy-policy-build.py - resolve config/privacy-policy.yaml to IPs.
+privacy-policy-build.py - resolve the privacy policy configs to IPs.
 
-Source of truth: config/privacy-policy.yaml (deny) and config/privacy-keep.yaml
-(overrides). This script:
+Source of truth: config/privacy-policy.yaml (deny), config/privacy-keep.yaml
+(global keep overrides), config/manufacturer.yaml (Samsung deny-by-default
+zones) and config/manufacturer-keep.yaml (essential Samsung allowlist).
+This script:
 
   1. Collects entries per tier (one source of truth: per-entry `tiers:` lists):
        standard  = entries whose `tiers` include "standard"
@@ -12,6 +14,11 @@ Source of truth: config/privacy-policy.yaml (deny) and config/privacy-keep.yaml
        voice     = entries whose `tiers` include "voice" (reference list)
        strict    = ALL entries (strict is the superset)
        doh       = the `doh` section (strict-only, IP-based)
+       mlock     = standard-no-voice + Samsung deny-by-default zones (regex)
+                   + essential Samsung allowlist (allows); the recommended
+                   manufacturer-lockdown profile. It deliberately does NOT
+                   inherit strict's low-confidence third-party telemetry or
+                   DoH-IP set.
   2. Resolves every domain against an EXTERNAL resolver (8.8.8.8 via dig) -
      deliberately NOT the local Pi-hole, which may return synthetic/empty
      answers for blocked domains.
@@ -42,7 +49,24 @@ import yaml
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 POLICY = os.path.join(ROOT, "config", "privacy-policy.yaml")
 KEEP = os.path.join(ROOT, "config", "privacy-keep.yaml")
+MANUF = os.path.join(ROOT, "config", "manufacturer.yaml")
+MANUF_KEEP = os.path.join(ROOT, "config", "manufacturer-keep.yaml")
 OUTDIR = os.path.join(ROOT, "data", "privacy-policy")
+
+# Anti-wildcard guard: the ONLY zones config/manufacturer.yaml may use for
+# deny-by-default. Adding a new zone requires a reviewed code change here -
+# the build refuses anything else, so no new wildcard zone can sneak in.
+KNOWN_SAMSUNG_ZONES = {
+    "samsungacr.com", "samsungads.com", "samsungcloud.tv", "samsungcloud.com",
+    "samsungcloudcdn.com", "samsungcloudsolution.com", "samsungcloudsolution.net",
+    "samsungotn.net", "samsungnyc.com", "samsung.com", "samsungosp.com",
+    "bixbyllm.com", "sbixby.com",
+}
+
+# Deliberately NOT zones (documented in research/samsung-ownership.yaml):
+#   aibixby.com      - already controlled by the voice-tier *.aibixby.com regex
+#   samsungqbe.com   - dynamic app infra, documented breakage (Perflyst #82)
+#   samsungadhub.com - lapsed + drop-captured, not Samsung-owned today
 
 
 def resolve(domain, resolver):
@@ -66,6 +90,33 @@ def resolve(domain, resolver):
             except ValueError:
                 pass
     return sorted(set(ips)), True
+
+
+def zone_of(domain, zones):
+    """Return the deny zone `domain` falls under (exact or subdomain), else None."""
+    dl = domain.strip().lower()
+    for z in sorted(zones, key=len, reverse=True):
+        if dl == z or dl.endswith("." + z):
+            return z
+    return None
+
+
+def zone_regex(zone, keep_hosts=None):
+    r"""Deny-by-default regex for one Samsung zone.
+
+    Generated form:
+      ^(([A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*)?\.)?samsungcloudsolution\.com\.?$
+    - www.samsungcloudsolution.com   -> MATCHES (denied, unknown Samsung host)
+    - samsungcloudsolution.com       -> apex also denied (label part optional)
+    Keep hosts inside the zone (time., cdn., ...) are NOT exempted in the
+    regex: this FTL build's regex validator rejects lookaround (RE2-style
+    engine, verified 2026-09-21), and keep protection is carried by the
+    group-scoped Pi-hole ALLOW rows (allow beats deny in FTL; proven by the
+    selftest's keep-host resolution test). Sublabels of a keep host
+    (x.time.\u2026) are NOT auto-allowed - allow explicitly via
+    manufacturer-review.sh if needed.
+    """
+    return (r"^(([A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*)\.)?" + re.escape(zone) + r"\.?$")
 
 
 def collect_tier_entries(doc):
@@ -112,6 +163,10 @@ def main():
         policy = yaml.safe_load(fh)
     with open(KEEP, encoding="utf-8") as fh:
         keep = yaml.safe_load(fh)
+    with open(MANUF, encoding="utf-8") as fh:
+        manuf = yaml.safe_load(fh)
+    with open(MANUF_KEEP, encoding="utf-8") as fh:
+        mkeep = yaml.safe_load(fh)
 
     std_entries, senv_entries, voice_entries, strict_entries, doh_entries = collect_tier_entries(policy)
     keep_domains = [(k["domain"].strip().lower(), k) for k in (keep.get("keeps") or [])]
@@ -189,6 +244,71 @@ def main():
     print("Resolving %d DoH endpoint domains ..." % len(doh_entries))
     doh = build_section(doh_entries, "doh")
 
+    # --- Manufacturer deny-by-default (manufacturer-lockdown) -----------------
+    # Samsung-owned zone + keep host      -> ALLOW (group-scoped allow row; FTL
+    #                                          allow beats deny - regex is plain)
+    # Samsung-owned zone + explicit deny  -> DENY (privacy-policy.yaml tiers)
+    # Samsung-owned zone + anything else  -> DENY + LOG (zone regex in the group)
+    # Non-Samsung domains                  -> untouched (normal egress)
+    zones = [z["domain"].strip().lower() for z in (manuf.get("deny_default_zones") or [])]
+    bad_zones = [z for z in zones if z not in KNOWN_SAMSUNG_ZONES]
+    if bad_zones:
+        sys.exit("FATAL: unknown zone(s) in config/manufacturer.yaml: %s - "
+                 "a deny-by-default zone must be added to KNOWN_SAMSUNG_ZONES "
+                 "in privacy-policy-build.py first (no silent new wildcards)."
+                 % ", ".join(bad_zones))
+    mkeep_hosts = sorted({k["domain"].strip().lower()
+                          for k in (mkeep.get("keeps") or []) if (k.get("domain") or "").strip()})
+    orphan = [h for h in mkeep_hosts if zone_of(h, zones) is None]
+    if orphan:
+        sys.exit("FATAL: manufacturer-keep host(s) outside any deny zone: %s "
+                 "(a keep entry must sit inside a zone to have effect)."
+                 % ", ".join(orphan))
+    missing_keep = [d for d, _ in keep_domains if zone_of(d, zones) and d not in mkeep_hosts]
+    if missing_keep:
+        sys.exit("FATAL: privacy-keep domain(s) inside a deny zone but missing from "
+                 "config/manufacturer-keep.yaml (the zone regex would silently deny them): %s"
+                 % ", ".join(missing_keep))
+
+    zone_regexes = []
+    for z in zones:
+        pat = zone_regex(z)
+        zone_regexes.append({"name": z, "pattern": pat})
+        # keep hosts inside the zone are protected by ALLOW rows (FTL allow
+        # beats deny), not by the regex; the regex must still be a working
+        # deny pattern: probe + apex must match.
+        for probe in ("zz9probe." + z, z):
+            if not re.match(pat, probe):
+                sys.exit("FATAL: zone regex for %s fails to match probe %s (regex broken)"
+                         % (z, probe))
+        # this FTL build rejects lookaround - guard against reintroducing it
+        if "(?" in pat:
+            sys.exit("FATAL: zone regex for %s uses lookaround, which this FTL "
+                     "build's validator rejects (RE2-style engine)" % z)
+
+    # Explicit extra denies for manufacturer-lockdown (manufacturer-review.sh block)
+    mlock_domains = set(senv["domains"])
+    mlock_ips = set(senv["ips"])
+    for e in (manuf.get("explicit_denies") or []):
+        d = (e.get("domain") or "").strip().lower()
+        if not d or d in keep_ips:
+            continue
+        mlock_domains.add(d)
+        d_ips, _ = resolve_cached(d)
+        for ip in d_ips:
+            if ip not in protected:
+                mlock_ips.add(ip)
+    mlock = {
+        "domains": sorted(mlock_domains),
+        "regexes": senv["regexes"] + zone_regexes,
+        "allows": mkeep_hosts,
+        "ips": sorted(mlock_ips),
+        "unresolved": senv["unresolved"],
+        "kept_out": senv["kept_out"],
+    }
+    if set(mlock["domains"]) < set(senv["domains"]) or set(mlock["ips"]) < set(senv["ips"]):
+        sys.exit("FATAL: manufacturer-lockdown section lost standard-no-voice entries")
+
     result = {
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "resolver": resolver,
@@ -199,10 +319,12 @@ def main():
         "voice": voice,
         "strict": strict,
         "doh": doh,
+        "manufacturer-lockdown": mlock,
         "keep": {
             "domains": sorted(keep_ips.keys()),
             "ips": sorted(protected),
         },
+        "manufacturer-zones": sorted(zones),
     }
 
     os.makedirs(OUTDIR, exist_ok=True)
@@ -237,7 +359,9 @@ def main():
     md = ["# Privacy policy preview", ""]
     md.append("Generated %s via resolver %s." % (result["generated_at"], resolver))
     md.append("")
-    md.append("Profiles (by inclusion): standard < standard-no-voice < strict.")
+    md.append("Profiles: standard < standard-no-voice < strict by privacy-entry "
+              "inclusion; manufacturer-lockdown = standard-no-voice + Samsung "
+              "deny-by-default zones + essential Samsung allowlist (recommended).")
     md.append("STANDARD: ACR + advertising + high-confidence telemetry. "
               "DoT 853 dropped. DNS :53 forced to Pi-hole (TVGuard baseline).")
     md.append("")
@@ -246,11 +370,24 @@ def main():
     md.append("")
     md.append("STRICT = standard-no-voice + low-confidence telemetry + DoH endpoint IPs.")
     md.append("")
+    md.append("MANUFACTURER-LOCKDOWN (recommended) = standard-no-voice + %d Samsung "
+              "deny-by-default zones + %d essential allow rows. Unknown Samsung "
+              "hosts are DENIED+LOGGED by default (review: scripts/show-unknown-samsung.sh, "
+              "scripts/manufacturer-review.sh). No strict low-conf additions, no new "
+              "firewall IPs beyond the standard-no-voice set."
+              % (len(zones), len(mkeep_hosts)))
+    md.append("")
     md.append(section_md("standard", standard))
     md.append(section_md("standard-no-voice", senv))
     md.append(section_md("voice (reference, in standard-no-voice + strict)", voice))
     md.append(section_md("strict", strict))
+    md.append(section_md("manufacturer-lockdown (recommended)", mlock))
     md.append(section_md("doh (strict only)", doh))
+    md.append("## manufacturer-lockdown allow rows (keep wins, group-scoped)")
+    md.append("")
+    for a in mlock["allows"]:
+        md.append("- allow `%s`" % a)
+    md.append("")
     md.append("## keep (protected, never blocked)")
     md.append("")
     md.append("%d domains, %d protected IPs." % (len(result["keep"]["domains"]), len(result["keep"]["ips"])))
@@ -267,6 +404,9 @@ def main():
           % (len(strict["domains"]), len(strict["ips"]), len(strict["kept_out"]), len(strict["unresolved"])))
     print("doh:      %d domains -> %d IPs (%d kept-out, %d unresolved)"
           % (len(doh["domains"]), len(doh["ips"]), len(doh["kept_out"]), len(doh["unresolved"])))
+    print("manufacturer-lockdown: %d domains -> %d IPs (%d zone regexes, %d allows)"
+          % (len(mlock["domains"]), len(mlock["ips"]),
+             len(mlock["regexes"]) - len(senv["regexes"]), len(mlock["allows"])))
     print("wrote %s and preview.md" % rj)
 
 

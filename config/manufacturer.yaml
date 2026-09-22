@@ -1,0 +1,122 @@
+#
+# manufacturer.yaml - Samsung/manufacturer DENY-BY-DEFAULT zone policy.
+#
+# Source of truth for the `manufacturer-lockdown` profile (built by
+# scripts/privacy-policy-build.py into data/privacy-policy/resolved.json):
+#
+#   config/privacy-policy.yaml      -> explicit privacy denies (ACR / ads / telemetry / voice)
+#   config/manufacturer-keep.yaml   -> essential Samsung allowlist (KEEP WINS)
+#   this file                       -> deny-by-default Samsung-owned zones
+#   config/privacy-keep.yaml        -> global keep overrides (never blocked, any profile)
+#
+# Semantics (per Samsung-owned zone, client-scoped to the TV in `applies_to`):
+#
+#   zone host in manufacturer-keep.yaml   -> ALLOW   (group-scoped Pi-hole allow row;
+#                                                 FTL allow beats deny; keep hosts are NOT
+#                                                 exempted in the regex because this FTL
+#                                                 build's validator rejects lookaround)
+#   zone host in privacy-policy.yaml      -> DENY    (explicit tier deny, as today)
+#   any other host in a listed zone       -> DENY + LOG (Pi-hole group regex; review via
+#                                              scripts/show-unknown-samsung.sh +
+#                                              scripts/manufacturer-review.sh keep/block)
+#   non-Samsung domain                     -> UNCHANGED (normal egress, no new rules)
+#
+# SAFETY (enforced by privacy-policy-build.py, build FAILS on violation):
+#   * every zone here must be in the build's KNOWN_SAMSUNG_ZONES whitelist
+#     (no silently adding a new wildcard zone);
+#   * every manufacturer-keep host must sit inside one of the listed zones;
+#   * every config/privacy-keep.yaml domain inside a listed zone must be in
+#     manufacturer-keep.yaml (otherwise the zone regex would silently deny it);
+#   * each generated zone regex is tested against probe + apex hosts at build
+#     time, and must not use lookaround (this FTL build's validator rejects it);
+#   * keep hosts are protected by group-scoped allow rows, proven end-to-end
+#     by the selftest (keep host must still resolve under the mock client).
+#
+# samsungqbe.com is deliberately NOT a zone: dynamic osb-*/gpm hosts, and
+# documented breakage if blocked (Perflyst issue #82) - see research/samsung-ownership.yaml.
+# samsungadhub.com is NOT a zone either: the domain lapsed and was drop-captured
+# (Namebright expired-parking NS, DropCatch registrar, 2026-09-21 RDAP) - its
+# names remain explicit denies in the advertising tier, but it is not
+# Samsung-owned today, so it does not get deny-by-default semantics.
+#
+deny_default_zones:
+  - domain: samsungacr.com
+    owner: Samsung
+    service: "ACR / viewing-history telemetry (dedicated zone)"
+    ownership_confidence: high
+    sources: [rdap, crtsh, safenetiot-imc2024, local-capture]
+  - domain: samsungads.com
+    owner: Samsung
+    service: "Samsung advertising platform"
+    ownership_confidence: high
+    sources: [rdap, crtsh, local-capture]
+  - domain: samsungcloud.tv
+    owner: Samsung
+    service: "mixed TV cloud: ACR, QoE telemetry, TV Plus EPG (EPG hosts kept)"
+    ownership_confidence: high
+    sources: [rdap, safenetiot-imc2024, local-capture]
+  - domain: samsungcloud.com
+    owner: Samsung
+    service: "Samsung app/cloud platform (play/api kept)"
+    ownership_confidence: high
+    sources: [rdap, local-capture]
+  - domain: samsungcloudcdn.com
+    owner: Samsung
+    service: "Samsung CDN / OTA (otn kept)"
+    ownership_confidence: high
+    sources: [rdap, perflyst]
+  - domain: samsungcloudsolution.com
+    owner: Samsung
+    service: "Samsung TV platform (time/cdn kept)"
+    ownership_confidence: high
+    sources: [rdap, perflyst, local-capture]
+  - domain: samsungcloudsolution.net
+    owner: Samsung
+    service: "Samsung TV platform .net twin (lcprd1/configprd/otnprd* kept)"
+    ownership_confidence: high
+    sources: [rdap, perflyst, local-capture]
+  - domain: samsungotn.net
+    owner: Samsung
+    service: "OTA / firmware update (www kept)"
+    ownership_confidence: high
+    sources: [rdap, perflyst]
+  - domain: samsungnyc.com
+    owner: Samsung
+    service: "Samsung NY media/image CDN (img-resize-cdn-prod kept)"
+    ownership_confidence: high
+    sources: [rdap, local-capture]
+  - domain: samsung.com
+    owner: Samsung
+    service: "corporate + TV services (multiscreen kept)"
+    ownership_confidence: high
+    sources: [rdap, fightback, local-capture]
+  - domain: samsungosp.com
+    owner: Samsung
+    service: "Samsung account auth + push (auth/gld.push/eu-auth2 kept)"
+    ownership_confidence: high
+    sources: [rdap, perflyst, local-capture]
+  - domain: bixbyllm.com
+    owner: Samsung
+    service: "Bixby LLM / Samsung Intelligence Service"
+    ownership_confidence: high
+    sources: [rdap, crtsh, hagezi]
+  - domain: sbixby.com
+    owner: Samsung
+    service: "Bixby voice/AI plane"
+    ownership_confidence: high
+    sources: [rdap, crtsh]
+
+# Whole family stays allowed - documented breakage, never a deny-default zone.
+non_zones:
+  - domain: samsungqbe.com
+    reason: "dynamic osb-*/gpm app infra; Perflyst #82: blocking breaks YouTube/Prime/TV Plus"
+    sources: [perflyst-82, known-breakage.yaml, local-capture]
+  - domain: samsungadhub.com
+    reason: "expired + drop-captured (NOT Samsung-owned today); names stay explicit ad denies only"
+    sources: [rdap]
+
+# Extra exact denies for manufacturer-lockdown, added by
+#   scripts/manufacturer-review.sh block <domain> [reason]
+# (kept last so the reviewer can append at end-of-file)
+explicit_denies:
+  # (none yet - added by scripts/manufacturer-review.sh block <domain> [reason])

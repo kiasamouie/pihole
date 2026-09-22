@@ -26,6 +26,9 @@ data/privacy-policy/
 # Offline-reconnect experiment output (runtime captures)
 data/offline-reconnect/
 
+# Manufacturer unknown-egress review data (runtime, contains live query detail)
+data/manufacturer-unknown/
+
 # Mined raw DNS history + resolution scratch (contains raw query logs - never commit)
 research/tmp/
 
