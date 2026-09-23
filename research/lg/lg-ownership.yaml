@@ -1,0 +1,143 @@
+#
+# research/lg/lg-ownership.yaml - LG domain-family ownership determination.
+#
+# 2026-09-22, from our own RDAP checks (research/tmp-lg/) + dig against
+# 8.8.8.8/1.1.1.1, cross-referenced against the research corpus in
+# research/lg/. This file feeds the design decisions in
+# config/lgtv/manufacturer.yaml (deny zones vs non-zones).
+#
+# Ownership methods: RDAP via https://rdap.org/domain/<name> (-L for
+# redirects); no whois binary on the host. Registrant string match against
+# known LG entities: "LG Electronics" / "LG CORPORATION" /
+# "PRMNS.LG.CO.KR" (LG's registrar-of-record for many names) /
+# "Alphonso" (LG's ad/ACR subsidiary, IONOS-hosted).
+#
+# Hosted-by is a separate question from ownership: several LG-registered
+# names CNAME into AWS (aws-prd.net / lgemp-prd.net = LG's AWS accounts).
+# Shared hosting is exactly why hostname-level policy (not IP/ASN blocking)
+# is the control mechanism for this project.
+
+- domain: lgsmartad.com
+  owner: LG
+  ownership_confidence: high
+  registrar: "LG (RDAP 2026-09-22)"
+  hosted_by: "mixed: apex 141.193.213.10 / 165.244.150.53 (parking-style), subhosts CNAME to AWS"
+  role: "dedicated ad zone (LG Ad Solutions)"
+  policy_action: deny_zone
+
+- domain: alphonso.tv
+  owner: "Alphonso (LG's ACR/ad vendor, subsidiary)"
+  ownership_confidence: high
+  registrar: "IONOS (LG subsidiary account)"
+  hosted_by: "internal: eu-acr1.alphonso.tv CNAMEs to random-label *.alphonso.tv (rotating)"
+  role: "ACR viewing recognition + ad endpoints; ROTATING numeric host names (eu-acrX)"
+  policy_action: deny_zone
+
+- domain: lgtvcommon.com
+  owner: LG
+  ownership_confidence: high
+  hosted_by: AWS (lgemp-prd.net CNAMEs for eic/aic cluster hosts)
+  role: "mixed: CDP beacons (ACR), nudge, homeprv, recommend, wiseconfig, cpauth, qcardservice, netflixvoice (voice proxy)"
+  policy_action: deny_zone
+  residual_risk: "functional subhosts (cpauth/qcardservice/wiseconfig) denied by default; restore via manufacturer-review keep if a function breaks"
+
+- domain: lgsmartplatform.com
+  owner: LG
+  ownership_confidence: high
+  hosted_by: AWS (eic-emp-lgsmartplatform-com.lgemp-prd.net, eu-west-1)
+  role: "smart-platform telemetry (de.emp live)"
+  policy_action: deny_zone
+
+- domain: lgtviot.com
+  owner: LG
+  ownership_confidence: high
+  hosted_by: AWS
+  role: "ThinQ/IoT telemetry (largest family ~5.1k queries, G1 audit)"
+  policy_action: deny_zone
+
+- domain: lgthinq.com
+  owner: LG
+  ownership_confidence: high
+  hosted_by: Azure (only LG family on Azure per certificate checks; entry points fail 443 handshake)
+  role: "ThinQ cloud sync"
+  policy_action: deny_zone
+
+- domain: nextlgsdp.com
+  owner: LG
+  ownership_confidence: high
+  hosted_by: "mixed AWS + Akamai (eic-gfts.nextlgsdp.com on Akamai per KallistoX)"
+  role: "SDP backbone: time sync (<cc> hosts), sdp_nlp voice (INSEPARABLE), store comms, billing (ibs.)"
+  policy_action: NON_ZONE_exact_denies_only
+  note: "zone-wide block documented to break time sync (hagezi#11438, furkan issue #6); rdx2./ibs./ibsstat. denied explicitly"
+
+- domain: lgtvsdp.com
+  owner: LG
+  ownership_confidence: high
+  hosted_by: AWS (gb/us CNAME to *-lgtvsdp-com.aws-prd.net)
+  role: "SDP TIME channel (systemTimeSource=sdp) + DRM (security.)"
+  policy_action: NON_ZONE_exact_denies_only
+  note: "furkan FORBIDDEN_APEX_ENTRIES guard: blocking the family = clock stuck 2021 = all TLS fails"
+
+- domain: wiselg.com
+  owner: LG (AWS-hosted, LG registrant)
+  ownership_confidence: high
+  hosted_by: AWS
+  role: "TV telemetry (eic.tv) + update transfer (eic/aic/kic-ngfts.tv.wiselg.com, functional per KallistoX)"
+  policy_action: deny_zone
+  keep_hosts: [tv.wiselg.com, eic-ngfts.tv.wiselg.com, aic-ngfts.tv.wiselg.com, kic-ngfts.tv.wiselg.com]
+
+- domain: lge.com
+  owner: LG
+  ownership_confidence: high
+  hosted_by: "wide: AWS/Akamai/etc"
+  role: "OTA (su/snu/su-ssl/nsu), file transfer (ngfts/gfts + cluster twins), plus uncharacterised hosts"
+  policy_action: NON_ZONE (OTA + file transfer are keep-list protected; zone is too broad to wildcard)
+
+- domain: lgappstv.com
+  owner: LG
+  ownership_confidence: high
+  hosted_by: AWS (store CDN)
+  role: "LG Content Store CDN/API"
+  policy_action: NON_ZONE (store must keep working)
+
+- domain: lgeapi.com
+  owner: LG
+  ownership_confidence: medium
+  role: "regional API; store/billing interplay unproven"
+  policy_action: NON_ZONE (weak evidence)
+
+- domain: lggalleryplus.com
+  owner: "LG (likely)"
+  ownership_confidence: medium
+  role: "Gallery+/SDX endpoint, single rooted-device community report"
+  policy_action: NON_ZONE (weak evidence)
+
+- domain: ueiwsp.com
+  owner: UNVERIFIED
+  ownership_confidence: low
+  note: "apex A = 1.1.1.1 placeholder; RDAP registrant not confirmable; 'QuickSet Cloud UEI' interop claim from repo issue only"
+  policy_action: UNCLASSIFIED (no rule)
+
+- domain: lgads.tv
+  owner: "LG (likely)"
+  ownership_confidence: medium
+  note: "apex shares parking IP with lgsmartad/alphonso; exact-name deny only (ad zone)"
+  policy_action: exact_deny
+
+- domain: lgemp-prd.net
+  owner: LG
+  ownership_confidence: high
+  note: "LG's AWS service-account domain (CNAME targets *-lgemp-prd.net) - NEVER block: it is shared hosting for many LG services incl. keeps"
+  policy_action: NEVER_BLOCK
+
+- domain: lgunifiedsmart.com
+  owner: LG (zone retired)
+  ownership_confidence: high
+  note: "apex NXDOMAIN 2026-09-12, whole zone gone - no rule"
+  policy_action: NONE (zone dead)
+
+- domain: lgsmartweb.com
+  owner: LG
+  ownership_confidence: medium
+  note: "decommissioned (NXDOMAIN 2026-09-12) voice-search backend; exact-name deny kept so the name stays denied if it revives"
+  policy_action: exact_deny (voice tier)

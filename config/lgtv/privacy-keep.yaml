@@ -1,0 +1,141 @@
+#
+# config/lgtv/privacy-keep.yaml - LG KEEP list (per-vendor).
+#
+# Domains (and their resolved IPs) that MUST override any LG deny candidate.
+# Same semantics as the Samsung keep list: the build resolves these through
+# an external resolver, and any LG deny candidate whose IP collides with a
+# keep domain's IP is removed from that vendor's firewall deny set (KEEP
+# WINS at IP level, so shared AWS/CloudFront/Akamai infrastructure is never
+# dropped for the LG while a keep service uses it).
+#
+# LG-owned keeps are additionally protected from the deny-by-default zone
+# regexes via the group-scoped ALLOW rows in
+# config/lgtv/manufacturer-keep.yaml (only hosts INSIDE a deny zone need
+# that; everything else is safe because the non-zone list in
+# config/lgtv/manufacturer.yaml is never wildcarded).
+#
+# Source key:
+#   furkan-safe        furkan-bayrak/lg-tv-blocklist live-traffic evidence (G1)
+#   hagezi             hagezi/dns-blocklists + Sept-2026 wire captures (KallistoX)
+#   perflyst           Perflyst/PiHoleBlocklist SmartTV LG section + issues
+#   level1techs        Level1Techs LG how-to (candidate evidence)
+#   dig-2026-09-22     our own DNS checks (research/tmp-lg/)
+#   local-capture      (not yet collected - the LG is not on the network yet)
+#
+keeps:
+
+  # --- LG time / SDP handshake (THE critical keep - blocking breaks the clock)
+  # webOS has no NTP: the SDP handshake with <cc>.lgtvsdp.com / <cc>.nextlgsdp.com
+  # sets the system clock. A blocked clock = 2021-01-01 = all TLS fails
+  # (Content Store, apps). Documented breakage: furkan-bayrak issue #6,
+  # hagezi#11438. These zones are NEVER deny-by-default (non_zones).
+  - domain: gb.lgtvsdp.com
+    reason: "LG SDP time channel, GB region (systemTimeSource=sdp)"
+    sources: [furkan-safe, hagezi, level1techs, dig-2026-09-22]
+  - domain: us.lgtvsdp.com
+    reason: "LG SDP time channel, US region (regional completeness)"
+    sources: [dig-2026-09-22]
+  - domain: gb.nextlgsdp.com
+    reason: "LG SDP backbone, GB region - KallistoX wire capture: 'service backbone' (11 TLS), carries time + store comms"
+    sources: [hagezi, furkan-safe, dig-2026-09-22]
+  - domain: cc.nextlgsdp.com
+    reason: "LG SDP backbone, cc (generic region) - keep for regional completeness"
+    sources: [dig-2026-09-22]
+  - domain: security.lgtvsdp.com
+    reason: "DRM/secure content channel - hagezi: must stay (DRM)"
+    sources: [hagezi]
+
+  # --- LG firmware / OTA / file transfer (never blocked, any profile)
+  - domain: su.lge.com
+    reason: "OTA update server"
+    sources: [furkan-strict, perflyst]
+  - domain: su-ssl.lge.com
+    reason: "OTA update server (SSL)"
+    sources: [furkan-strict]
+  - domain: snu.lge.com
+    reason: "firmware OTA check server"
+    sources: [furkan-strict]
+  - domain: nsu.lge.com
+    reason: "firmware OTA check server (regional)"
+    sources: [perflyst]
+  - domain: ngfts.lge.com
+    reason: "firmware/content file transfer - Perflyst: blocking breaks Content Store thumbnails"
+    sources: [furkan-strict, perflyst, hagezi]
+  - domain: gfts.lge.com
+    reason: "file transfer service"
+    sources: [furkan-strict]
+  - domain: eic-ngfts.lge.com
+    reason: "EU-cluster file transfer (NGFTS) - KallistoX: Akamai-served update transfer; furkan lists it strict (OTA kill) but OUR policy keeps firmware working"
+    sources: [furkan-strict, hagezi]
+  - domain: eic-gfts.lge.com
+    reason: "EU-cluster file transfer service (keep: firmware must work)"
+    sources: [furkan-strict]
+  - domain: eic-gfts.nextlgsdp.com
+    reason: "EU-cluster NGFTS file transfer on the SDP family (keep: firmware must work)"
+    sources: [hagezi]
+
+  # --- LG Content Store / app platform (keep: install/update must work)
+  - domain: api.lgappstv.com
+    reason: "LG Content Store API"
+    sources: [level1techs, hagezi]
+  - domain: lgappstv.com
+    reason: "store CDN apex (exact name only; the store family is never a deny zone)"
+    sources: [furkan-strict]
+  - domain: tv.wiselg.com
+    reason: "wiselg family host that 'likely carries NGFTS (functional)' (KallistoX wire capture) - protected by an ALLOW row in manufacturer-keep.yaml too"
+    sources: [hagezi]
+  - domain: eic-ngfts.tv.wiselg.com
+    reason: "EU-cluster update transfer, wiselg family (keep: firmware must work; furkan lists it strict but our policy keeps firmware)"
+    sources: [furkan-strict]
+  - domain: aic-ngfts.tv.wiselg.com
+    reason: "Americas-cluster update transfer, wiselg family (keep: firmware must work)"
+    sources: [furkan-strict]
+  - domain: kic-ngfts.tv.wiselg.com
+    reason: "Korea-cluster update transfer, wiselg family (keep: firmware must work)"
+    sources: [furkan-strict]
+
+  # --- Third-party keeps (IP-collision protection for shared infrastructure)
+  # Mirrors the Samsung keep list: these IPs must never enter the LG firewall
+  # deny set even when an LG ad/telemetry host resolves to the same address.
+  - domain: www.youtube.com
+    reason: "YouTube app/API"
+    sources: [perflyst, hagezi]
+  - domain: i.ytimg.com
+    reason: "YouTube image CDN"
+    sources: [perflyst]
+  - domain: yt3.ggpht.com
+    reason: "YouTube thumbnails"
+    sources: [perflyst]
+  - domain: yt3.googleusercontent.com
+    reason: "YouTube images"
+    sources: [perflyst]
+  - domain: lh3.googleusercontent.com
+    reason: "Google images (app icons)"
+    sources: [perflyst]
+  - domain: www.gstatic.com
+    reason: "Google static content"
+    sources: [perflyst]
+  - domain: tools.google.com
+    reason: "Google bootstrap"
+    sources: [perflyst]
+  - domain: clients1.google.com
+    reason: "Google service bootstrap"
+    sources: [perflyst]
+  - domain: mediaservices.cdn-apple.com
+    reason: "Apple AirPlay/casting services CDN (the LG supports AirPlay)"
+    sources: [perflyst, hagezi]
+  - domain: api.amazonvideo.com
+    reason: "Prime Video API"
+    sources: [perflyst]
+  - domain: api.amazon.co.uk
+    reason: "Amazon UK API (Prime Video)"
+    sources: [perflyst]
+  - domain: unagi-eu.amazon.com
+    reason: "Amazon EU API (Prime Video)"
+    sources: [perflyst]
+  - domain: global.telemetry.insights.video.a2z.com
+    reason: "shared Amazon/Infinitive video infrastructure - shared infra => keep until characterised"
+    sources: [perflyst]
+  - domain: mobile-data.onetrust.io
+    reason: "cookie-consent platform used by web apps; shared infra => keep"
+    sources: [perflyst]

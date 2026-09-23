@@ -1,0 +1,103 @@
+#
+# config/lgtv/manufacturer.yaml - LG deny-by-default zone policy
+# (the LG equivalent of config/manufacturer.yaml for Samsung).
+#
+# Source of truth for the LG `manufacturer-lockdown` profile, built by
+# scripts/privacy-policy-build.py into resolved.json under vendors.lg.
+#
+# Semantics (per LG-owned zone, client-scoped to the LG IP in `applies_to`):
+#
+#   zone host in manufacturer-keep.yaml   -> ALLOW   (group-scoped Pi-hole
+#                                                 allow row; FTL allow beats deny;
+#                                                 the zone regex is plain - this FTL
+#                                                 build's validator rejects lookaround)
+#   zone host in lgtv/privacy-policy.yaml -> DENY    (explicit tier deny)
+#   any other host in a listed zone       -> DENY + LOG (Pi-hole group regex;
+#                                                 review via scripts/show-unknown-samsung.sh lg
+#                                                 + scripts/manufacturer-review.sh lg)
+#   non-LG domain                         -> UNCHANGED (normal egress)
+#
+# SAFETY (enforced by the build, which FAILS on violation):
+#   * every zone here must be in the lg entry of config/privacy-instances.yaml
+#     (known_zones - the per-vendor anti-wildcard whitelist);
+#   * every manufacturer-keep host must sit inside one of the listed zones;
+#   * every lgtv/privacy-keep.yaml domain inside a listed zone must be in
+#     manufacturer-keep.yaml (otherwise the zone regex would silently deny it);
+#   * each generated zone regex is probe-tested at build time, no lookaround;
+#   * keep hosts are proven end-to-end by the selftest (mock-client resolution).
+#
+# The 7 zones below are the LG-owned single-purpose telemetry/ad/ACR/IoT
+# families. The MIXED infrastructure families are deliberately NON-ZONES
+# (see below) because they carry time sync, firmware, store and DRM.
+
+deny_default_zones:
+  - domain: alphonso.tv
+    owner: "Alphonso (IONOS-registered; LG's ACR/ad vendor since Jan 2022, ex-Gracenote/Unruly)"
+    service: "ACR viewing recognition + ad endpoints (ROTATING names eu-acrX/tkacrX - suffix control required)"
+    ownership_confidence: high
+    sources: [rdap-2026-09-22, safenetiot-imc2024, lg-official, perflyst]
+  - domain: lgsmartad.com
+    owner: LG
+    service: "dedicated ad zone - whole family is ads (LG Ad Solutions)"
+    ownership_confidence: high
+    sources: [rdap-2026-09-22, furkan-safe, lg-official]
+  - domain: lgtvcommon.com
+    owner: LG
+    service: "mixed telemetry/CDP/ACR/voice-proxy family. RESIDUAL RISK: the zone also carries a few functional subhosts (cpauth, qcardservice, wiseconfig - KallistoX wire capture); they are denied by default and must be restored via manufacturer-review.sh lg keep if a TV function breaks."
+    ownership_confidence: high
+    sources: [rdap-2026-09-22, furkan-safe, hagezi, level1techs]
+  - domain: lgsmartplatform.com
+    owner: LG
+    service: "smart-platform telemetry (de.emp observed; regional siblings uncovered by exact lists)"
+    ownership_confidence: high
+    sources: [rdap-2026-09-22, furkan-safe]
+  - domain: lgtviot.com
+    owner: LG
+    service: "ThinQ/IoT telemetry (largest LG telemetry family ~5.1k queries in the G1 audit) - INTENTIONAL KILL of the ThinQ cloud"
+    ownership_confidence: high
+    sources: [rdap-2026-09-22, furkan-safe]
+  - domain: lgthinq.com
+    owner: LG
+    service: "ThinQ cloud sync (Azure-hosted family) - INTENTIONAL KILL of the ThinQ app/voice cloud"
+    ownership_confidence: high
+    sources: [rdap-2026-09-22, furkan-strict]
+  - domain: wiselg.com
+    owner: LG
+    service: "TV telemetry + update-transfer family. Keep hosts (tv., eic/aic/kic-ngfts.tv.wiselg.com) are allow-row protected - the zone kills only the unclassified telemetry hosts."
+    ownership_confidence: high
+    sources: [rdap-2026-09-22, furkan-safe, hagezi]
+
+# Whole families stay allowed - documented breakage, never a deny-default zone:
+non_zones:
+  - domain: lge.com
+    reason: "OTA (su/snu/su-ssl/nsu), file transfer (ngfts/gfts + cluster *-ngfts/*-gfts), wide corporate zone - blocking breaks firmware/updates"
+    sources: [furkan-safe, perflyst, hagezi]
+  - domain: lgtvsdp.com
+    reason: "SDP TIME channel (systemTimeSource=sdp): furkan issue #6 + hagezi#11438 - blocking the family leaves the clock stuck at 2021-01-01 and all TLS fails; exact-name denies only (rdx2.)"
+    sources: [furkan-safe, hagezi, level1techs]
+  - domain: nextlgsdp.com
+    reason: "SDP backbone: <cc> hosts carry time sync + store comms (KallistoX: DE.nextlgsdp.com = 'service backbone', 11 TLS); voice NLP (sdp_nlp) is multiplexed here and network-layer INSEPARABLE from essential function; explicit denies only (rdx2.; ibs/ibsstat are mlock explicit denies)"
+    sources: [hagezi, furkan-safe, level1techs]
+  - domain: lgappstv.com
+    reason: "Content Store CDN family - install/update must keep working"
+    sources: [furkan-strict, level1techs]
+  - domain: lgeapi.com
+    reason: "regional API, store/billing interplay unproven (weak evidence only)"
+    sources: [furkan-strict]
+  - domain: lggalleryplus.com
+    reason: "Gallery+/SDX - community-reported only (L1Techs #255178), single rooted-device source"
+    sources: [furkan-strict, level1techs]
+  - domain: ueiwsp.com
+    reason: "NOT proven LG-owned: apex A record is 1.1.1.1 (placeholder), no RDAP registrant match found 2026-09-22 - left unclassified"
+    sources: [rdap-2026-09-22, dig-2026-09-22]
+
+# Extra exact denies for LG manufacturer-lockdown, added by
+#   sudo scripts/manufacturer-review.sh lg block <domain> [reason]
+# (kept last so the reviewer can append at end-of-file)
+explicit_denies:
+  - domain: ibs.nextlgsdp.com
+    reason: "in-app BILLING infra (KallistoX wire capture: DE.ibs.nextlgsdp.com 4 DNS + 4 TLS; hagezi blocks it) - mlock-only deny; if Content Store purchases/activation break, review and remove"
+    sources: [hagezi, furkan-strict]
+  - domain: ibsstat.nextlgsdp.com
+    reason: "billing telemetry twin of ibs (hagezi) - mlock-only deny"
+    sources: [hagezi]

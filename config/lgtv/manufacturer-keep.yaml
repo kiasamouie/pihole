@@ -1,0 +1,25 @@
+#
+# config/lgtv/manufacturer-keep.yaml - LG essential allowlist (per-vendor).
+#
+# Hosts INSIDE an LG deny-by-default zone that must stay allowed under
+# manufacturer-lockdown. Each entry becomes a group-scoped Pi-hole ALLOW row
+# in "TVGuard-Privacy-LG" (FTL: allow beats deny for that client), which is
+# how keep wins inside a zone on this FTL build (its regex validator rejects
+# lookaround, so the zone regex itself stays plain).
+#
+# Every entry here must sit inside one of the deny_default_zones in
+# config/lgtv/manufacturer.yaml (the build fails otherwise).
+#
+keeps:
+  - domain: tv.wiselg.com
+    reason: "wiselg family host that 'likely carries NGFTS (functional)' (KallistoX wire capture, hagezi) - allow-row protected inside the wiselg.com zone"
+    sources: [hagezi]
+  - domain: eic-ngfts.tv.wiselg.com
+    reason: "EU-cluster firmware update transfer, wiselg family - allow-row protected (firmware must keep working)"
+    sources: [furkan-strict]
+  - domain: aic-ngfts.tv.wiselg.com
+    reason: "Americas-cluster firmware update transfer, wiselg family - allow-row protected"
+    sources: [furkan-strict]
+  - domain: kic-ngfts.tv.wiselg.com
+    reason: "Korea-cluster firmware update transfer, wiselg family - allow-row protected"
+    sources: [furkan-strict]

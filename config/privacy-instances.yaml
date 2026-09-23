@@ -1,0 +1,61 @@
+#
+# privacy-instances.yaml - vendor registry for the multi-vendor privacy engine.
+#
+# Each vendor is a FULLY INDEPENDENT policy instance:
+#   * its own deny/keep/manufacturer config files (below),
+#   * its own resolved section in data/privacy-policy/resolved.json (vendors.<v>),
+#   * its own nftables client set (tv_privacy_<v>) and deny-IP set
+#     (tv_privacy_blocked_<v>), rendered by scripts/tvguard-apply.sh,
+#   * its own Pi-hole group (samsung: TVGuard-Privacy, lg: TVGuard-Privacy-LG),
+#   * its own state line in /var/lib/tvguard/privacy-state
+#     (PRIVACY-<vendor>=<tier>; the legacy single line PRIVACY=<tier> is still
+#     read as samsung=... for backward compatibility).
+#
+# Samsung state must never be interpreted as LG state or vice versa: the
+# state file, the resolved.json sections, the nftables sets and the Pi-hole
+# groups are disjoint per vendor. A failure applying one vendor never
+# disables the other; rollback is per-vendor (privacy-policy-disable.sh lg).
+#
+# known_zones: the ONLY zones a vendor's manufacturer.yaml may use for
+# deny-by-default (moved out of privacy-policy-build.py, one list per vendor).
+# The build refuses any other zone, so no new wildcard can sneak in per vendor.
+#
+instances:
+
+  samsung:
+    label: "Samsung QE65Q75CATXXU (192.168.0.197)"
+    policy: config/privacy-policy.yaml
+    keep: config/privacy-keep.yaml
+    manufacturer: config/manufacturer.yaml
+    manufacturer_keep: config/manufacturer-keep.yaml
+    pihole_group: TVGuard-Privacy
+    known_zones:
+      - samsungacr.com
+      - samsungads.com
+      - samsungcloud.tv
+      - samsungcloud.com
+      - samsungcloudcdn.com
+      - samsungcloudsolution.com
+      - samsungcloudsolution.net
+      - samsungotn.net
+      - samsungnyc.com
+      - samsung.com
+      - samsungosp.com
+      - bixbyllm.com
+      - sbixby.com
+
+  lg:
+    label: "LG webOS TV (address assigned after first network discovery)"
+    policy: config/lgtv/privacy-policy.yaml
+    keep: config/lgtv/privacy-keep.yaml
+    manufacturer: config/lgtv/manufacturer.yaml
+    manufacturer_keep: config/lgtv/manufacturer-keep.yaml
+    pihole_group: TVGuard-Privacy-LG
+    known_zones:
+      - alphonso.tv
+      - lgsmartad.com
+      - lgtvcommon.com
+      - lgsmartplatform.com
+      - lgtviot.com
+      - lgthinq.com
+      - wiselg.com

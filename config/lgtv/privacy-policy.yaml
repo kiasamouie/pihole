@@ -1,0 +1,655 @@
+#
+# config/lgtv/privacy-policy.yaml - LG webOS TV privacy blocking (LG vendor instance).
+#
+# This is the LG equivalent of config/privacy-policy.yaml (Samsung). The build
+# (scripts/privacy-policy-build.py) resolves these domains per vendor; the
+# firewall part renders into the per-vendor nftables sets (tv_privacy_lg /
+# tv_privacy_blocked_lg) and the DNS part pushes into the per-vendor Pi-hole
+# group "TVGuard-Privacy-LG". The Samsung instance is untouched and lives on
+# its own files/group/state line.
+#
+# Tiers (per entry, `tiers:` list) - same semantics as the Samsung policy:
+#   standard : in standard, standard-no-voice and strict
+#   voice    : in standard-no-voice and strict (NOT in plain standard)
+#   strict   : in strict only
+#
+# Profiles:
+#   standard          = ACR + advertising + high-confidence telemetry
+#                       + DNS forcing + DoT enforcement.
+#   standard-no-voice = standard + confirmed LG voice-cloud blocking.
+#   strict            = standard-no-voice + lower-confidence (DNS-only)
+#                       datacentre-cluster twins + known-DoH-endpoint IPs.
+#   manufacturer-lockdown = standard-no-voice + LG deny-by-default zones
+#                       (config/lgtv/manufacturer.yaml) + essential LG
+#                       allowlist (config/lgtv/manufacturer-keep.yaml).
+#                       RECOMMENDED profile for this TV.
+#
+# Evidence hierarchy (research/lg/ - 2026-09-22):
+#   local-capture        observed on THIS TV (Pi-hole history / captures) - not yet
+#                        collected (the LG is not on the network yet); every entry
+#                        below is therefore externally sourced and must be validated
+#                        against a local baseline before final sign-off.
+#   safenetiot-imc2024   IMC 2024 paper + SafeNetIoT/ACR repo (LG ACR experiments)
+#   furkan-safe          furkan-bayrak/lg-tv-blocklist src/safe.txt (live-traffic-verified on a G1)
+#   furkan-strict        same repo src/strict.txt (DNS-verified, weak evidence)
+#   hagezi               hagezi/dns-blocklists + its Sept-2026 issue history
+#   perflyst             Perflyst/PiHoleBlocklist SmartTV LG section + issues
+#   level1techs          Level1Techs "LG TV Block" mini-how-to (rooted G5 - candidate evidence only)
+#   lg-official          LG privacy statement 2026-09-12 (ACR / Alphonso / cross-device ads)
+#
+# Rules: EXACT domains only, EXCEPT the documented `kind: suffix` exception
+# (same mechanism as Samsung's aibixby.com voice family): allowed only when
+# research proves the zone is a single-purpose family. For LG that is
+# lgsmartad.com (dedicated ad zone) and alphonso.tv (the ACR/ad vendor
+# zone with ROTATING host names eu-acrX.alphonso.tv - suffix control is the
+# only reliable way to catch the rotating names; see research/lg/safenetiot-lg.md).
+# Domains in config/lgtv/privacy-keep.yaml override everything (keep wins).
+
+applies_to:
+  [] # EMPTY until the LG is discovered on the network. The engine treats an
+     # empty list as "vendor inactive": the build resolves the policy, but
+     # applying errors with a clear message and no firewall/Pi-hole objects
+     # are created for this vendor. After discovery (scripts/discover-lan.sh),
+     # add the LG's IP here AND to TVS in config/tvguard.conf.
+
+updated: "2026-09-22"
+version: 1
+
+policies:
+
+  acr:
+    description: >
+      LG Automatic Content Recognition. IMC 2024 (SafeNetIoT/ACR) proves LG
+      webOS runs Shazam-like content matching to Alphonso (LG's ACR/ad
+      vendor since Jan 2022, replacing Gracenote/Unruly). Critical
+      implementation detail: the ACR host name is a SINGLE host per region
+      whose numeric suffix ROTATES PERIODICALLY (eu-acrX.alphonso.tv in the
+      EU, tkacrX.alphonso.tv in the US). Exact-name lists therefore silently
+      stop blocking when LG rotates the number - this is why the suffix
+      entry below is the primary control. The ACR beacon also moved from
+      bare cdpbeacon.lgtvcommon.com (now NXDOMAIN) to the eic/aic/kic
+      datacentre-cluster twins, which are included as exact entries.
+    default: false
+    entries:
+      - domain: alphonso.tv
+        kind: suffix
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        hosts:
+          - eu-acr1.alphonso.tv
+          - tkacr1.alphonso.tv
+          - choice.alphonso.tv
+        sources: [safenetiot-imc2024, lg-official, hagezi, perflyst, samsapti]
+        expected_breakage: "none to playback - ACR viewing recognition + ad vendor endpoints only (rotating eu-acrX names covered by the suffix)"
+      - domain: eu-acr1.alphonso.tv
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        sources: [safenetiot-imc2024, perflyst, dig-2026-09-22]
+        expected_breakage: "none - EU ACR endpoint (current name; also covered by the suffix)"
+      - domain: tkacr1.alphonso.tv
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [safenetiot-imc2024, perflyst, dig-2026-09-22]
+        expected_breakage: "none - US ACR endpoint (regional completeness; also covered by the suffix)"
+      - domain: cdpbeacon.lgtvcommon.com
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        sources: [furkan-strict, safenetiot-imc2024]
+        expected_breakage: "none - legacy ACR beacon (decommissioned/NXDOMAIN 2026-09-12; kept for the audit record)"
+      - domain: eic.cdpbeacon.lgtvcommon.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [furkan-strict, dig-2026-09-22]
+        expected_breakage: "none - EU-cluster ACR beacon (current location of the 6-min heartbeat)"
+      - domain: aic.cdpbeacon.lgtvcommon.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "none - Americas-cluster ACR beacon (regional completeness)"
+      - domain: kic.cdpbeacon.lgtvcommon.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "none - Korea-cluster ACR beacon (regional completeness)"
+
+  advertising:
+    description: >
+      LG Ad Solutions / Alphonso ad infrastructure + the ad exchanges that
+      serve webOS home-screen/app ads. No broad Google domains: YouTube /
+      googlevideo / gstatic content paths are protected by the keep list.
+    default: false
+    entries:
+      - domain: lgsmartad.com
+        kind: suffix
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        hosts:
+          - de.info.lgsmartad.com
+          - info.lgsmartad.com
+        sources: [furkan-safe, level1techs, lg-official]
+        expected_breakage: "none - dedicated ad zone; whole family is ads (admanager ~60s poll, home-screen ads)"
+      - domain: lgads.tv
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi, perflyst]
+        expected_breakage: "none - LG ad zone (apex)"
+      - domain: static.doubleclick.net
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        sources: [hagezi, perflyst, furkan-strict]
+        expected_breakage: "none - ad static assets"
+      - domain: pagead2.googlesyndication.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi, perflyst]
+        expected_breakage: "none - ad serving (YouTube content paths stay free via keep list)"
+      - domain: yumenetworks.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi, perflyst]
+        expected_breakage: "none - ad network"
+      - domain: smartclip.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi, perflyst]
+        expected_breakage: "none - ad network"
+      - domain: na-ssp-pix.adstk.io
+        tiers: [standard]
+        confidence: low
+        observed_locally: false
+        sources: [perflyst, blocklist lg-smarttv]
+        expected_breakage: "none expected - ad SSP (low: list-only evidence)"
+      - domain: cdn-media.brightline.tv
+        tiers: [standard]
+        confidence: low
+        observed_locally: false
+        sources: [blocklist lg-smarttv]
+        expected_breakage: "none expected - ad CDN (low: list-only evidence)"
+
+  telemetry:
+    description: >
+      webOS analytics/metrics, IoT (ThinQ) telemetry, ad/nudge/promo
+      configuration and the CDP beacon cluster. High-confidence entries
+      (standard tier) carry live traffic evidence from the furkan-bayrak
+      G1 audit or the HaGeZi wire capture; the DNS-only aic./kic. cluster
+      twins stay in strict (never block on DNS existence alone).
+      Firmware/OTA (su*/snu/ngfts/gfts .lge.com) is NOT telemetry here - it
+      is keep-list protected and never blocked.
+    default: false
+    entries:
+      - domain: eic.lgtviot.com
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        sources: [furkan-safe, hagezi]
+        expected_breakage: "ThinQ cloud sync stops (intended); the largest LG telemetry family (~5.1k queries in the G1 audit)"
+      - domain: eic.api.lgtviot.com
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        sources: [furkan-safe]
+        expected_breakage: "ThinQ IoT API telemetry stops (intended)"
+      - domain: eic.tv.wiselg.com
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        sources: [furkan-safe, hagezi]
+        expected_breakage: "TV telemetry stops (intended); blocked live on the G1 audit with apps fine"
+      - domain: eic.nudge.lgtvcommon.com
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        sources: [furkan-safe]
+        expected_breakage: "notification nudges stop (intended)"
+      - domain: eic.wiseconfig.lgtvcommon.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [furkan-safe, hagezi]
+        expected_breakage: "cloud-config telemetry stops; blocked live on the G1 audit with apps fine (KallistoX kept it - if home-screen features misbehave, allow via manufacturer-review.sh)"
+      - domain: de.emp.lgsmartplatform.com
+        tiers: [standard]
+        confidence: high
+        observed_locally: false
+        sources: [furkan-safe, dig-2026-09-22]
+        expected_breakage: "smart-platform telemetry stops (intended)"
+      - domain: rdx2.nextlgsdp.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [furkan-strict, hagezi]
+        expected_breakage: "none expected - unknown SDP telemetry host (currently NXDOMAIN; DNS deny still protects the name)"
+      - domain: rdx2.lgtvsdp.com
+        tiers: [standard]
+        confidence: medium
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "none expected - unknown host in the time channel zone (currently NXDOMAIN; exact name only - the family is keep-protected)"
+
+  voice:
+    description: >
+      LG cloud voice / NLP infrastructure. webOS runs the wake word and the
+      voice-input stack LOCALLY (SoC); the cloud round-trip goes through the
+      nextlgsdp.com SDX zone (sdp_nlp) and lgsmartweb.com. IMPORTANT
+      LIMITATION (documented, research/lg/level1techs.md + hagezi-lg.md):
+      the main NLP channel is multiplexed inside the nextlgsdp.com zone,
+      which ALSO carries the TV's time sync (SDP handshake), store
+      communications and DRM - that zone is network-layer INSEPARABLE from
+      essential function, so it must NOT be blocked (blocking it = clock
+      stuck at 2021 -> all TLS fails; the furkan-bayrak repo's own
+      documented breakage, 2026-09-16). What this tier blocks: the
+      standalone voice hosts. Expected consequence: cloud voice
+      recognition/search degrades or fails - intended in
+      standard-no-voice/strict.
+    default: false
+    entries:
+      - domain: lgsmartweb.com
+        tiers: [voice]
+        confidence: medium
+        observed_locally: false
+        sources: [level1techs, furkan-strict]
+        expected_breakage: "voice SEARCH fails (intended); host is decommissioned (NXDOMAIN) - row kept so the name stays denied if it revives"
+      - domain: netflixvoice.lgtvcommon.com
+        tiers: [voice]
+        confidence: medium
+        observed_locally: false
+        sources: [level1techs, hagezi]
+        expected_breakage: "Netflix voice remote channel stops (intended); also inside the lgtvcommon mlock zone"
+      - domain: qt2-kic.lab.lgtvcommon.com
+        tiers: [voice]
+        confidence: low
+        observed_locally: false
+        sources: [level1techs, hagezi]
+        expected_breakage: "ThinQ AI lab channel stops (intended); also inside the lgtvcommon mlock zone"
+
+  strict:
+    description: >
+      LG-only strict additions: the 53 DNS-verified (NOT traffic-verified)
+      aic./kic. datacentre-cluster twins from furkan-bayrak src/strict.txt
+      (2026-09-12). They sit in strict because the evidence is "DNS
+      existence, not traffic observation" - regional twins of hosts the G1
+      audit (Germany, eic only) traffic-verified. Blocking them cannot
+      break streaming playback (no documented breakage), but regional
+      telemetry/ad coverage becomes complete.
+    default: false
+    entries:
+      - domain: aic-gfts.lge.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster file-transfer telemetry (DNS-only evidence)"
+      - domain: aic-ngfts.lge.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster update transfer (DNS-only evidence)"
+      - domain: aic-ngfts.nextlgsdp.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster update transfer on SDP family (DNS-only)"
+      - domain: aic-ngfts.tv.wiselg.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster update transfer, wiselg family (DNS-only)"
+      - domain: aic-ocp.lgtviot.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "unknown IoT host (DNS-only)"
+      - domain: aic-op-lss.lgthinq.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster ThinQ operations telemetry (DNS-only)"
+      - domain: aic.ads.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster ad delivery (DNS-only)"
+      - domain: aic.api.lgtviot.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster IoT telemetry API (DNS-only)"
+      - domain: aic.cdplauncher.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster content-launcher/CDP (DNS-only)"
+      - domain: aic.homeprv.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster home-screen provisioning/promos (DNS-only)"
+      - domain: aic.lgchhomeapp.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster home-app service (DNS-only)"
+      - domain: aic.lgeapi.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas region API (store/billing interplay unproven - DNS-only)"
+      - domain: aic.lggalleryplus.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster Gallery+/SDX (DNS-only)"
+      - domain: aic.lgshopsvc.lgappstv.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster LG Shop service (DNS-only)"
+      - domain: aic.lgthinq.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster ThinQ entry point (DNS-only)"
+      - domain: aic.lgtviot.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster IoT telemetry (DNS-only)"
+      - domain: aic.nudge.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster nudge telemetry (DNS-only)"
+      - domain: aic.recommend.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster recommendations/promos (DNS-only)"
+      - domain: aic.service.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster common services (DNS-only)"
+      - domain: aic.tv.wiselg.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster TV telemetry (DNS-only)"
+      - domain: aic.wiseconfig.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Americas-cluster cloud-config telemetry (DNS-only)"
+      - domain: eic-ngfts.nextlgsdp.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Europe-cluster update transfer on SDP family (DNS-only; the EU TV would hit this - if firmware transfers ever stall, allow via manufacturer-review.sh)"
+      - domain: eic.ads.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Europe-cluster ad delivery (DNS-only)"
+      - domain: eic.homeprv.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Europe-cluster home-screen provisioning/promos (DNS-only)"
+      - domain: eic.lgeapi.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Europe region API (DNS-only)"
+      - domain: eic.lggalleryplus.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Europe-cluster Gallery+/SDX (DNS-only)"
+      - domain: eic.lgshopsvc.lgappstv.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Europe-cluster LG Shop service (DNS-only)"
+      - domain: eic.lgthinq.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Europe-cluster ThinQ entry point (DNS-only)"
+      - domain: eic.recommend.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Europe-cluster recommendations/promos (DNS-only)"
+      - domain: eic.service.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Europe-cluster common services (DNS-only)"
+      - domain: kic-gfts.lge.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster file-transfer service (DNS-only)"
+      - domain: kic-ngfts.lge.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster update transfer (DNS-only)"
+      - domain: kic-ngfts.nextlgsdp.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster update transfer on SDP family (DNS-only)"
+      - domain: kic-ngfts.tv.wiselg.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster update transfer, wiselg family (DNS-only)"
+      - domain: kic-ocp.lgtviot.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "unknown IoT host (DNS-only)"
+      - domain: kic-op-lss.lgthinq.com
+        tiers: [strict]
+        confidence: low
+        sources: [furkan-strict]
+        observed_locally: false
+        expected_breakage: "Korea-cluster ThinQ operations telemetry (DNS-only)"
+      - domain: kic.ads.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster ad delivery (DNS-only)"
+      - domain: kic.api.lgtviot.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster IoT telemetry API (DNS-only)"
+      - domain: kic.cdplauncher.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster content-launcher/CDP (DNS-only)"
+      - domain: kic.homeprv.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster home-screen provisioning/promos (DNS-only)"
+      - domain: kic.lgchhomeapp.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster home-app service (DNS-only)"
+      - domain: kic.lgeapi.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea region API (DNS-only)"
+      - domain: kic.lggalleryplus.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster Gallery+/SDX (DNS-only)"
+      - domain: kic.lgthinq.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster ThinQ entry point (DNS-only)"
+      - domain: kic.lgtviot.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster IoT telemetry (DNS-only)"
+      - domain: kic.nudge.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster nudge telemetry (DNS-only)"
+      - domain: kic.recommend.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster recommendations/promos (DNS-only)"
+      - domain: kic.service.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster common services (DNS-only)"
+      - domain: kic.tv.wiselg.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster TV telemetry (DNS-only)"
+      - domain: kic.wiseconfig.lgtvcommon.com
+        tiers: [strict]
+        confidence: low
+        observed_locally: false
+        sources: [furkan-strict]
+        expected_breakage: "Korea-cluster cloud-config telemetry (DNS-only)"
+
+  doh:
+    description: >
+      Same known-DoH-endpoint set as the Samsung instance (HaGeZi DoH list
+      snapshot). Resolved to IPs and blocked in nftables for the LG ONLY in
+      strict mode, AFTER excluding any IP shared with a keep-list domain
+      (keep wins). If the set shrinks to empty, DoH is reported PARTIALLY
+      CONTROLLED (DNS forcing + DoT deny still apply).
+    default: false
+    entries:
+      - domain: dns.google
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: one.one.one.one
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: dns.cloudflare.com
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: dns.quad9.net
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: dns9.quad9.net
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: dns.adguard.com
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: adguard-dns.com
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+      - domain: dns.nextdns.io
+        tiers: [strict]
+        confidence: medium
+        observed_locally: false
+        sources: [hagezi-doh]
+        expected_breakage: "only if an IP unique to DoH is identified"
+
+# Structural (non-domain) enforcement. Implemented by tvguard-apply.sh from
+# the per-vendor state lines; identical semantics to the Samsung instance.
+structural:
+  dns_53: "FORCE - LG -> any external :53 (udp/tcp) is DNAT'd to the local Pi-hole. NOTE: webOS runs its own DNS stub on 127.0.0.1:53 and hardcodes 8.8.8.8/1.1.1.1 (research/lg/lg-tv-blocklist.md) - this DNAT is what makes those hard-coded resolvers ineffective."
+  dot_853: "DROP in ALL profiles - tcp+udp, new connections, logged as TVGUARD-DOT-LG"
+  doh_ips: "DROP in strict only, resolved at build time, keep-list overlap excluded"
+  quic: "NEVER blocked - UDP/443 must remain usable for streaming"
+  https_443: "NEVER blocked"
