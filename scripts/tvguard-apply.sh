@@ -61,63 +61,72 @@ NFT_FILE="$STATE_DIR/tvguard.nft"
 # production always uses the default name.
 TGUARD_TABLE="${TGUARD_TABLE:-tvguard}"
 
-# --- Privacy policy state (separate dimension from monitor/enforce) ----------
-# Set by scripts/privacy-policy-apply.sh (standard|standard-no-voice|strict|
-# manufacturer-lockdown) and privacy-policy-disable.sh (off). When active, the resolved IP list produced by privacy-
-# policy-build.py (data/privacy-policy/resolved.json) is rendered as an extra
-# DROP set in the forward chain. It never changes NAT, the DNS-bypass DNAT,
-# or the TVGuard monitor/enforce mode. When off, the rendered table is
-# byte-identical to the pre-privacy ruleset.
-# PRIVACY-SCOPE FIX (2026-09-22): the privacy rules (deny-set drop, DoT 853,
-# external :53 DNAT) must match ONLY the policy's `applies_to` list from
-# config/privacy-policy.yaml (Samsung .197), NOT the full TVS list (which
-# also contains e.g. the Google TV .90, explicitly outside applies_to).
-# They therefore match a dedicated `tv_privacy` set. TVS-only rules
-# (TV->LAN accept, TV->Internet monitor log/accept, masquerade, return traffic)
-# are unchanged.
+# --- Privacy policy state (multi-vendor; separate dimension from monitor/enforce)
+# Per-vendor state lines in $PRIVACY_STATE_FILE: PRIVACY-<vendor>=<tier>
+# (legacy: a single line PRIVACY=<tier> is parsed as samsung=<tier> for
+# backward compatibility). Vendors come from config/privacy-instances.yaml.
+# Each ACTIVE vendor renders its own, DISJOINT objects:
+#   * client set   tv_privacy_<vendor>        (the vendor's applies_to only)
+#   * deny-IP set  tv_privacy_blocked_<vendor>
+#   * DoH-IP set   tv_doh_blocked_<vendor>    (strict only)
+#   * log prefixes TVGUARD-PRIVACY-<VENDOR> / TVGUARD-DOH-<VENDOR> /
+#                  TVGUARD-DOT-<VENDOR>
+# Applying/disabling one vendor never touches the other vendor's sets, rules,
+# Pi-hole group or state line. The vendor privacy rules (deny-set drop, DoT
+# 853, external :53 DNAT) match ONLY that vendor's applies_to list - never
+# the full TVS list (which may contain TVs outside the privacy policy). When
+# every vendor is off, the rendered table is identical to the pre-privacy
+# ruleset. It never changes NAT, the TVGuard monitor/enforce mode, or UFW.
 PRIVACY_STATE_FILE="$STATE_DIR/privacy-state"
 PRIVACY_RESOLVED="$ROOT/data/privacy-policy/resolved.json"
-PRIVACY_MODE="off"
-if [ -f "$PRIVACY_STATE_FILE" ]; then
-  PRIVACY_MODE="$(sed -n 's/^PRIVACY=//p' "$PRIVACY_STATE_FILE" | tail -1)"
-fi
-case "$PRIVACY_MODE" in standard|standard-no-voice|strict|manufacturer-lockdown) : ;; *) PRIVACY_MODE="off" ;; esac
-PRIVACY_IPS=""
-PRIVACY_DOH_IPS=""
-PRIVACY_TV_SOURCE=""
-PRIVACY_TV_LIST=""
-if [ "$PRIVACY_MODE" != "off" ]; then
-  PRIVACY_TV_SOURCE="${PRIVACY_TARGETS:-}"
-  if [ -z "$PRIVACY_TV_SOURCE" ]; then
-    PRIVACY_TV_SOURCE="$(python3 - "$ROOT/config/privacy-policy.yaml" <<'PYEOF' 2>/dev/null
-targets, in_list = [], False
-for line in open(__import__("sys").argv[1]):
-    s = line.strip()
-    if s.startswith("applies_to:"):
-        in_list = True
+PRIVACY_VENDOR_ROWS=""
+if [ -f "$PRIVACY_STATE_FILE" ] && [ -f "$PRIVACY_RESOLVED" ] && command -v python3 >/dev/null 2>&1; then
+  PRIVACY_VENDOR_ROWS="$(python3 - "$ROOT/config/privacy-instances.yaml" "$PRIVACY_STATE_FILE" "$PRIVACY_RESOLVED" <<'PYEOF' 2>/dev/null
+import json, os, sys
+import yaml
+inst = yaml.safe_load(open(sys.argv[1])).get("instances") or {}
+states = {}
+if os.path.exists(sys.argv[2]):
+    for line in open(sys.argv[2]):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        k, _, v = line.partition("=")
+        k, v = k.strip(), v.strip()
+        if k == "PRIVACY":
+            states.setdefault("samsung", v)
+        elif k.startswith("PRIVACY-"):
+            states[k[len("PRIVACY-"):].strip().lower()] = v
+res = json.load(open(sys.argv[3]))
+tiers = ("standard", "standard-no-voice", "strict", "manufacturer-lockdown")
+for v, cfg in inst.items():
+    tier = states.get(v, "off")
+    if tier not in tiers:
+        tier = "off"
+    if tier == "off":
+        print("\t".join([v, tier, "", "", ""]))
         continue
-    if in_list:
-        if s.startswith("- "):
-            item = s[2:].split("#", 1)[0]
-            targets.append(item.strip().strip('"').strip("'"))
-        elif s and not s.startswith("#"):
-            in_list = False
-print(" ".join(target for target in targets if target))
+    vs = (res.get("vendors") or {}).get(v) or {}
+    sec = vs.get(tier) or {}
+    doh = (vs.get("doh") or {}).get("ips", []) if tier == "strict" else []
+    targets = vs.get("applies_to") or []
+    # field order: vendor, tier, deny-ips, targets, doh-ips (the optional doh
+    # field is LAST so an empty value cannot shift the read() fields)
+    print("\t".join([v, tier,
+                     ",".join(sorted(sec.get("ips", []))),
+                     ",".join(targets),
+                     ",".join(sorted(doh))]))
 PYEOF
 )"
-  fi
-  PRIVACY_TV_SOURCE="${PRIVACY_TV_SOURCE:-$TVS}"
-  PRIVACY_TV_LIST=""
-  for tv in $PRIVACY_TV_SOURCE; do
-    PRIVACY_TV_LIST="${PRIVACY_TV_LIST}${PRIVACY_TV_LIST:+, }$tv"
-  done
-  if [ -f "$PRIVACY_RESOLVED" ] && command -v python3 >/dev/null 2>&1; then
-    PRIVACY_IPS="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(" ".join(sorted(d.get(sys.argv[2],{}).get("ips",[]))))' "$PRIVACY_RESOLVED" "$PRIVACY_MODE" 2>/dev/null)"
-    PRIVACY_DOH_IPS="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(" ".join(sorted(d.get("doh",{}).get("ips",[]))))' "$PRIVACY_RESOLVED" 2>/dev/null)"
-  fi
 fi
-PRIVACY_IPS_CSV="${PRIVACY_IPS// /, }"
-PRIVACY_DOH_IPS_CSV="${PRIVACY_DOH_IPS// /, }"
+# Render fragments (built after the Pi-hole container IP is known):
+#   PRIVACY_SETS       - nft set definitions (all vendors)
+#   PRIVACY_FORWARD    - forward-chain drop/DoT rules (all vendors)
+#   PRIVACY_PREROUTING - external :53 DNAT rules (all vendors)
+PRIVACY_SETS=""
+PRIVACY_FORWARD=""
+PRIVACY_PREROUTING=""
+PRIVACY_SUMMARY=""
 
 # Resolve the Pi-hole container IP for the DNS-bypass DNAT (see prerouting
 # comment). Empty => render falls back to `redirect`.
@@ -125,6 +134,58 @@ PIHOLE_CONTAINER_IP=""
 if command -v docker >/dev/null 2>&1; then
   PIHOLE_CONTAINER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' pihole 2>/dev/null | awk 'NF' | head -1)
   [ -n "$PIHOLE_CONTAINER_IP" ] || echo "WARN: could not resolve pihole container IP; DNS bypass will use redirect fallback" >&2
+fi
+
+# --- Build the per-vendor privacy fragments ---------------------------------
+# One line per vendor from the state file (tab-separated):
+#   vendor <TAB> tier <TAB> deny-ips (csv) <TAB> doh-ips (csv) <TAB> applies_to (csv)
+if [ -n "$PRIVACY_VENDOR_ROWS" ]; then
+  while IFS=$'\t' read -r p_vendor p_tier p_ips p_targets p_doh; do
+    case "$p_tier" in standard|standard-no-voice|strict|manufacturer-lockdown) : ;; *) continue ;; esac
+    [ -n "$p_targets" ] || { echo "WARN: privacy vendor $p_vendor active (tier $p_tier) but has no applies_to targets - skipping its render" >&2; continue; }
+    p_upper="${p_vendor^^}"
+    p_client="tv_privacy_${p_vendor}"
+    p_blk="tv_privacy_blocked_${p_vendor}"
+    p_dohset="tv_doh_blocked_${p_vendor}"
+    PRIVACY_SETS="${PRIVACY_SETS}    set $p_client {
+        type ipv4_addr ;
+        elements = { $p_targets } ;
+    }
+"
+    if [ -n "$p_ips" ]; then
+      PRIVACY_SETS="${PRIVACY_SETS}    set $p_blk {
+        type ipv4_addr ;
+        flags interval ;
+        elements = { $p_ips } ;
+    }
+"
+      PRIVACY_FORWARD="${PRIVACY_FORWARD}        ip saddr @$p_client ip daddr @$p_blk ct state new counter log prefix \"TVGUARD-PRIVACY-$p_upper \" drop
+"
+    fi
+    if [ "$p_tier" = "strict" ] && [ -n "$p_doh" ]; then
+      PRIVACY_SETS="${PRIVACY_SETS}    set $p_dohset {
+        type ipv4_addr ;
+        flags interval ;
+        elements = { $p_doh } ;
+    }
+"
+      PRIVACY_FORWARD="${PRIVACY_FORWARD}        ip saddr @$p_client ip daddr @$p_dohset ct state new counter log prefix \"TVGUARD-DOH-$p_upper \" drop
+"
+    fi
+    PRIVACY_FORWARD="${PRIVACY_FORWARD}        ip saddr @$p_client tcp dport 853 ct state new counter log prefix \"TVGUARD-DOT-$p_upper \" drop
+        ip saddr @$p_client udp dport 853 ct state new counter log prefix \"TVGUARD-DOT-$p_upper \" drop
+"
+    if [ -n "$PIHOLE_CONTAINER_IP" ]; then
+      PRIVACY_PREROUTING="${PRIVACY_PREROUTING}        ip saddr @$p_client ip daddr != $PIHOLE_IP meta l4proto udp th dport 53 dnat to $PIHOLE_CONTAINER_IP:53
+        ip saddr @$p_client ip daddr != $PIHOLE_IP meta l4proto tcp th dport 53 dnat to $PIHOLE_CONTAINER_IP:53
+"
+    else
+      PRIVACY_PREROUTING="${PRIVACY_PREROUTING}        ip saddr @$p_client ip daddr != $PIHOLE_IP meta l4proto udp th dport 53 redirect to :53
+        ip saddr @$p_client ip daddr != $PIHOLE_IP meta l4proto tcp th dport 53 redirect to :53
+"
+    fi
+    PRIVACY_SUMMARY="${PRIVACY_SUMMARY}  privacy[$p_vendor]=$p_tier (deny-IPs: $(printf '%s' "$p_ips" | tr ',' ' ' | wc -w), doh-IPs: $(printf '%s' "$p_doh" | tr ',' ' ' | wc -w), scope: $p_targets)\n"
+  done <<< "$PRIVACY_VENDOR_ROWS"
 fi
 
 # Resolve the operating mode.
@@ -182,46 +243,24 @@ BLOCKED_IPS="$(parse_blocked_ips)"
   fi
   echo "    }"
 
-  # Privacy policy sets (present only when a privacy tier is active).
-  if [ "$PRIVACY_MODE" != "off" ]; then
-    echo "    set tv_privacy {"
-    echo "        type ipv4_addr ;"
-    echo "        elements = { $PRIVACY_TV_LIST } ;"
-    echo "    }"
-  fi
-  if [ -n "$PRIVACY_IPS" ]; then
-    echo "    set tv_privacy_blocked {"
-    echo "        type ipv4_addr ;"
-    echo "        flags interval ;"
-    echo "        elements = { $PRIVACY_IPS_CSV } ;"
-    echo "    }"
-  fi
-  if [ "$PRIVACY_MODE" = "strict" ] && [ -n "$PRIVACY_DOH_IPS" ]; then
-    echo "    set tv_doh_blocked {"
-    echo "        type ipv4_addr ;"
-    echo "        flags interval ;"
-    echo "        elements = { $PRIVACY_DOH_IPS_CSV } ;"
-    echo "    }"
+  # Privacy policy sets, per active vendor (tv_privacy_<vendor>,
+  # tv_privacy_blocked_<vendor>, tv_doh_blocked_<vendor>). Each vendor's rules
+  # match ONLY its own applies_to client set, so vendors are fully disjoint.
+  if [ -n "$PRIVACY_SETS" ]; then
+    printf '%s' "$PRIVACY_SETS"
   fi
 
   echo "    chain forward {"
   echo "        type filter hook forward priority -150 ;"
   # TV -> LAN (incl. the hub .1). Accept. NOTE: flat L2 PoC - this is NOT LAN isolation.
   echo "        ip saddr @tvs ip daddr $LAN_SUBNET counter accept"
-  # Privacy policy drops (new connections from a PRIVACY-SCOPED TV to resolved
-  # deny-list IPs / known DoH endpoint IPs). Matches @tv_privacy (applies_to
-  # only - never the full tvs list), so TVs outside the policy (e.g. the
-  # Google TV) are unaffected. ct state new means established flows keep
-  # working until they end; blocked attempts are logged.
-  if [ -n "$PRIVACY_IPS" ]; then
-    echo "        ip saddr @tv_privacy ip daddr @tv_privacy_blocked ct state new counter log prefix \"TVGUARD-PRIVACY \" drop"
-  fi
-  if [ "$PRIVACY_MODE" = "strict" ] && [ -n "$PRIVACY_DOH_IPS" ]; then
-    echo "        ip saddr @tv_privacy ip daddr @tv_doh_blocked ct state new counter log prefix \"TVGUARD-DOH \" drop"
-  fi
-  if [ "$PRIVACY_MODE" != "off" ]; then
-    echo "        ip saddr @tv_privacy tcp dport 853 ct state new counter log prefix \"TVGUARD-DOT \" drop"
-    echo "        ip saddr @tv_privacy udp dport 853 ct state new counter log prefix \"TVGUARD-DOT \" drop"
+  # Privacy policy drops, per active vendor (deny-set drop + DoT :853 +
+  # optional DoH-IP set in strict). Matches @tv_privacy_<vendor> (applies_to
+  # only - never the full tvs list), so clients outside a vendor's policy are
+  # unaffected. ct state new means established flows keep working until they
+  # end; blocked attempts are logged with the vendor-specific prefix.
+  if [ -n "$PRIVACY_FORWARD" ]; then
+    printf '%s' "$PRIVACY_FORWARD"
   fi
   if [ "$MODE" = "enforce" ]; then
     echo "        ip saddr @tvs tcp dport 853 counter log prefix \"TVGUARD-DOT \" drop"
@@ -256,18 +295,11 @@ BLOCKED_IPS="$(parse_blocked_ips)"
   # If the container IP cannot be resolved (docker not running at boot), we
   # fall back to `redirect` - the query still reaches Pi-hole, attribution
   # just shows the bridge IP.
-  # DNS-bypass forcing is PRIVACY-SCOPED too (@tv_privacy): external :53 is
-  # forced to Pi-hole for the policy's applies_to TVs only. TVs outside the
-  # policy (e.g. the Google TV, which uses the Hub as gateway and does not
-  # traverse this box) are unaffected.
-  if [ "$PRIVACY_MODE" != "off" ]; then
-    if [ -n "$PIHOLE_CONTAINER_IP" ]; then
-      echo "        ip saddr @tv_privacy ip daddr != $PIHOLE_IP meta l4proto udp th dport 53 dnat to $PIHOLE_CONTAINER_IP:53"
-      echo "        ip saddr @tv_privacy ip daddr != $PIHOLE_IP meta l4proto tcp th dport 53 dnat to $PIHOLE_CONTAINER_IP:53"
-    else
-      echo "        ip saddr @tv_privacy ip daddr != $PIHOLE_IP meta l4proto udp th dport 53 redirect to :53"
-      echo "        ip saddr @tv_privacy ip daddr != $PIHOLE_IP meta l4proto tcp th dport 53 redirect to :53"
-    fi
+  # DNS-bypass forcing is PRIVACY-SCOPED per vendor: external :53 is forced
+  # to Pi-hole for each vendor's applies_to TVs only (per-vendor client sets
+  # rendered above). TVs outside every policy are unaffected.
+  if [ -n "$PRIVACY_PREROUTING" ]; then
+    printf '%s' "$PRIVACY_PREROUTING"
   fi
   echo "    }"
 
@@ -279,10 +311,12 @@ BLOCKED_IPS="$(parse_blocked_ips)"
   echo "}"
 } > "$NFT_FILE"
 
-PRIVACY_IP_COUNT=$(printf '%s' "$PRIVACY_IPS" | awk '{print NF}')
-PRIVACY_DOH_COUNT=$(printf '%s' "$PRIVACY_DOH_IPS" | awk '{print NF}')
 echo "Mode:        $MODE"
-echo "Privacy:     $PRIVACY_MODE (deny-IPs: $PRIVACY_IP_COUNT, doh-IPs: $PRIVACY_DOH_COUNT, scope: ${PRIVACY_TV_LIST:-n/a})"
+if [ -n "$PRIVACY_SUMMARY" ]; then
+  printf 'Privacy:     %b' "$PRIVACY_SUMMARY"
+else
+  echo "Privacy:     off"
+fi
 echo "Egress IF:   $EGRESS_IF"
 echo "TVs:         $TV_LIST"
 echo "Blocked:     ${BLOCKED_IPS:-<none>}"
@@ -370,11 +404,11 @@ else
   echo "  (TGUARD_TVS set: state file not written - dry/test table)"
 fi
 
-# Refresh the privacy-state file only if it exists (we never enable privacy
+# Report the per-vendor privacy state (we never enable privacy
 # from this script - that is privacy-policy-apply.sh's job). This keeps the
 # state consistent if the file was hand-edited.
 if [ -f "$PRIVACY_STATE_FILE" ]; then
-  echo "  privacy state: $PRIVACY_MODE" >&2
+  echo "  privacy state: $(grep -E '^PRIVACY(-[A-Za-z0-9]+)?=' "$PRIVACY_STATE_FILE" | tr '\n' ' ')" >&2
 fi
 
 echo "OK: TVGuard loaded in $MODE mode (table ip $TGUARD_TABLE)."

@@ -11,23 +11,32 @@
 #   sudo scripts/manufacturer-review.sh block <domain> [reason]   # document the deny
 #
 # It NEVER auto-allows anything. Data is merged into
-# data/manufacturer-unknown/unknown-samsung.csv (git-ignored, runtime only).
+# data/manufacturer-unknown/unknown-<vendor>.csv (git-ignored, runtime only).
 #
 # Usage:
-#   sudo scripts/show-unknown-samsung.sh [hours]    (default 24)
+#   sudo scripts/show-unknown-samsung.sh [vendor] [hours]
+#     vendor: samsung (default) | lg
+#     hours:  default 24
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"
-HOURS="${1:-24}"
+# vendor-aware args: [vendor] [hours] with a bare [hours] still working
+VENDOR="samsung"; HOURS="24"
+case "${1:-}" in
+  samsung|lg) VENDOR="$1"; HOURS="${2:-24}" ;;
+  "") HOURS="${1:-24}" ;;
+  *) HOURS="$1" ;;
+esac
 
-PRIVACY_ROOT="$ROOT" HOURS="$HOURS" python3 - <<'PYEOF'
+PRIVACY_ROOT="$ROOT" HOURS="$HOURS" VENDOR="$VENDOR" python3 - <<'PYEOF'
 import json, os, re, sys, time, urllib.request, urllib.error, urllib.parse, yaml, csv
 
 ROOT = os.environ["PRIVACY_ROOT"]
 HOURS = int(os.environ.get("HOURS", "24"))
+VENDOR = os.environ.get("VENDOR", "samsung")
 BASE = "http://127.0.0.1:3001"
 OUTDIR = os.path.join(ROOT, "data", "manufacturer-unknown")
-CSV = os.path.join(OUTDIR, "unknown-samsung.csv")
+CSV = os.path.join(OUTDIR, "unknown-%s.csv" % VENDOR)
 
 pw = ""
 for line in open(os.path.join(ROOT, ".env")):
@@ -57,21 +66,23 @@ if code != 200:
     sys.exit("Pi-hole login failed: %s" % res)
 SID = res["session"]["sid"]
 
-# target TV: first applies_to entry
-doc = yaml.safe_load(open(os.path.join(ROOT, "config", "privacy-policy.yaml")))
+# vendor config paths from the registry; target TV: first applies_to entry
+inst = (yaml.safe_load(open(os.path.join(ROOT, "config", "privacy-instances.yaml"))).get("instances") or {})[VENDOR]
+doc = yaml.safe_load(open(os.path.join(ROOT, inst["policy"])))
 TV = str((doc.get("applies_to") or ["192.168.0.197"])[0])
 
 # classification sets
-manuf = yaml.safe_load(open(os.path.join(ROOT, "config", "manufacturer.yaml")))
+manuf = yaml.safe_load(open(os.path.join(ROOT, inst["manufacturer"])))
 zones = [z["domain"].strip().lower() for z in (manuf.get("deny_default_zones") or [])]
-mkeepd = yaml.safe_load(open(os.path.join(ROOT, "config", "manufacturer-keep.yaml")))
+mkeepd = yaml.safe_load(open(os.path.join(ROOT, inst["manufacturer_keep"])))
 keeps = {k["domain"].strip().lower() for k in (mkeepd.get("keeps") or [])}
 explicit = {e["domain"].strip().lower() for e in (manuf.get("explicit_denies") or []) if (e.get("domain") or "")}
 resolved = json.load(open(os.path.join(ROOT, "data", "privacy-policy", "resolved.json")))
+vs = (resolved.get("vendors") or {}).get(VENDOR) or {}
 known_deny = set()
 rxs = []
 for sec in ("standard", "standard-no-voice", "strict", "manufacturer-lockdown", "voice"):
-    s = resolved.get(sec) or {}
+    s = vs.get(sec) or {}
     known_deny |= set(s.get("domains", []))
     rxs += [r["pattern"] for r in (s.get("regexes") or [])]
 try:
@@ -172,12 +183,12 @@ if prev:
         for name in sorted(prev):
             w.writerow(prev[name])
 
-print("Samsung-zone queries from %s, last %dh: %d total, %d unknown (denied-by-default), %d allowlisted (skipped)"
-      % (TV, HOURS, len(qs), len(rows), len(keeps)))
+print("%s-zone queries from %s, last %dh: %d total, %d unknown (denied-by-default), %d allowlisted (skipped)"
+      % (VENDOR, TV, HOURS, len(qs), len(rows), len(keeps)))
 if not rows:
-    print("\nNo unknown Samsung destinations in the window. Nothing to review.")
+    print("\nNo unknown %s destinations in the window. Nothing to review." % VENDOR)
 else:
-    print("\nUNKNOWN SAMSUNG DESTINATIONS (denied by default - decide: keep | block | leave unknown):")
+    print("\nUNKNOWN %s DESTINATIONS (denied by default - decide: keep | block | leave unknown):" % VENDOR)
     print("%-6s %-45s %-12s %-16s %s" % ("count", "domain", "first_seen", "last_seen", "zone"))
     for name in sorted(rows, key=lambda n: -rows[n]["count"]):
         v = rows[name]
@@ -187,7 +198,7 @@ else:
             time.strftime("%m-%d %H:%M", time.gmtime(v["last"])),
             v["zone"]))
     print("\nDecide each one:")
-    print("  allow:  sudo scripts/manufacturer-review.sh keep  <domain> [reason]")
-    print("  block:  sudo scripts/manufacturer-review.sh block <domain> [reason]")
+    print("  allow:  sudo scripts/manufacturer-review.sh %s keep  <domain> [reason]" % VENDOR)
+    print("  block:  sudo scripts/manufacturer-review.sh %s block <domain> [reason]" % VENDOR)
     print("review CSV: %s" % CSV)
 PYEOF

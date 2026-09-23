@@ -17,10 +17,11 @@
 #   * never touches UFW, Docker, Pi-hole, TVGuard mode or the nftables rules
 #
 # Usage:
-#   sudo scripts/privacy-reset-tv-manufacturer-state.sh
-#       (Samsung .197 + manufacturer-lockdown IP set)
-#   sudo scripts/privacy-reset-tv-manufacturer-state.sh 192.168.0.90
-#   sudo scripts/privacy-reset-tv-manufacturer-state.sh 192.168.0.197 strict
+#   sudo scripts/privacy-reset-tv-manufacturer-state.sh [vendor]
+#       (vendor default samsung; TV = first applies_to entry of that vendor)
+#   sudo scripts/privacy-reset-tv-manufacturer-state.sh <vendor> <tv-ip> [section]
+#   sudo scripts/privacy-reset-tv-manufacturer-state.sh <tv-ip> [section]
+#       (legacy form = samsung vendor)
 #       (any resolved.json section: standard|standard-no-voice|voice|strict|
 #        manufacturer-lockdown; default manufacturer-lockdown, falling back to
 #        standard-no-voice if the section is absent)
@@ -35,29 +36,31 @@ command -v conntrack >/dev/null || { echo "conntrack tool not found" >&2; exit 4
 [ -f "$ROOT/data/privacy-policy/resolved.json" ] || { echo "no data/privacy-policy/resolved.json - run privacy-policy-build.py first" >&2; exit 5; }
 
 FLUSH_DNS=0
+VENDOR="samsung"
 TV=""
 SECTION=""
 for a in "$@"; do
   case "$a" in
     --flush-dns-cache) FLUSH_DNS=1 ;;
     -*) echo "unknown flag: $a" >&2; exit 4 ;;
+    samsung|lg) VENDOR="$a" ;;
     *) if [ -z "$TV" ]; then TV="$a"; else SECTION="$a"; fi ;;
   esac
 done
 
 if [ -z "$TV" ]; then
-  TV=$(python3 -c '
-import sys, yaml
-doc = yaml.safe_load(open(sys.argv[1] + "/config/privacy-policy.yaml"))
-print((doc.get("applies_to") or ["192.168.0.197"])[0])
-' "$ROOT")
+  TV=$(VENDOR_ROOT="$ROOT" VENDOR="$VENDOR" python3 -c '
+import os
+import yaml
+inst = yaml.safe_load(open(os.environ["VENDOR_ROOT"] + "/config/privacy-instances.yaml"))["instances"][os.environ["VENDOR"]]
+doc = yaml.safe_load(open(os.environ["VENDOR_ROOT"] + "/" + inst["policy"]))
+t = (doc.get("applies_to") or ["192.168.0.197"])
+print(t[0] if t else "")
+')
 fi
+[ -n "$TV" ] || { echo "vendor $VENDOR has no applies_to client - pass the TV IP explicitly" >&2; exit 5; }
 if [ -z "$SECTION" ]; then
-  SECTION=$(python3 -c '
-import json, sys
-d = json.load(open(sys.argv[1] + "/data/privacy-policy/resolved.json"))
-print("manufacturer-lockdown" if "manufacturer-lockdown" in d else "standard-no-voice")
-' "$ROOT")
+  SECTION=manufacturer-lockdown
 fi
 echo "target TV: $TV | section: $SECTION"
 
@@ -66,11 +69,17 @@ if [ "$FLUSH_DNS" = "1" ]; then
   docker exec pihole pihole -f 2>/dev/null && echo "  cache flushed" || echo "  WARN: could not flush Pi-hole cache (docker/pihole CLI)"
 fi
 
-IPS=$(python3 -c '
-import sys, json
-d = json.load(open(sys.argv[1] + "/data/privacy-policy/resolved.json"))
-print(" ".join(sorted(set(d.get(sys.argv[2], {}).get("ips", [])))))
-' "$ROOT" "$SECTION")
+IPS=$(VENDOR="$VENDOR" ROOT="$ROOT" python3 -c '
+import os, sys, json
+d = json.load(open(os.environ["ROOT"] + "/data/privacy-policy/resolved.json"))
+v = os.environ["VENDOR"]
+vs = (d.get("vendors") or {}).get(v) or {}
+sec = sys.argv[1]
+if sec in vs:
+    print(" ".join(sorted(set(vs[sec].get("ips", [])))))
+elif d.get(sec, {}).get("ips") and v == "samsung":
+    print(" ".join(sorted(set(d[sec].get("ips", [])))))
+' "$SECTION")
 
 if [ -z "${IPS// /}" ]; then
   echo "no resolved IPs for section $SECTION - nothing to reset" >&2

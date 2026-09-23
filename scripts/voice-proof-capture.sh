@@ -27,18 +27,20 @@ ROOT="$(dirname "$SCRIPT_DIR")"
 if [ "$(id -u)" -ne 0 ]; then echo "run with sudo" >&2; exit 3; fi
 
 LABEL="${1:-voice-proof}"
-TV="192.168.0.197"
-if [ -f "$ROOT/config/privacy-policy.yaml" ]; then
-  TV=$(python3 -c '
-import sys, yaml
-with open(sys.argv[1]) as policy:
-    doc = yaml.safe_load(policy)
+VENDOR="${2:-samsung}"
+TV=$(VENDOR="$VENDOR" ROOT="$ROOT" python3 -c '
+import os, yaml
+root = os.environ["ROOT"]; v = os.environ["VENDOR"]
+try:
+    inst = yaml.safe_load(open(root + "/config/privacy-instances.yaml"))["instances"][v]
+    doc = yaml.safe_load(open(root + "/" + inst["policy"]))
+except (FileNotFoundError, KeyError):
+    doc = yaml.safe_load(open(root + "/config/privacy-policy.yaml"))
 print((doc.get("applies_to") or ["192.168.0.197"])[0])
-' "$ROOT/config/privacy-policy.yaml")
-fi
+')
 
 echo "====================================================================="
-echo " VOICE-PROOF CAPTURE  (tv=$TV, label=$LABEL)"
+echo " VOICE-PROOF CAPTURE  (tv=$TV, vendor=$VENDOR, label=$LABEL)"
 echo " 120s PRE | 120s ACTIVE | 180s POST   (7 minutes total)"
 echo " When 'ACTIVE' starts: press the mic and ask, in order:"
 echo "   1. What is the weather in Tokyo right now?"

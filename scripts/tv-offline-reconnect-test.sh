@@ -3,6 +3,7 @@
 # tv-offline-reconnect-test.sh - "offline buffering" experiment for a TV.
 #
 #   sudo scripts/tv-offline-reconnect-test.sh samsung [offline-min] [post-min]
+#   sudo scripts/tv-offline-reconnect-test.sh lg [offline-min] [post-min]   (needs LG_IP set)
 #   (defaults: 5 min offline, 10 min post-reconnect observation)
 #
 # What it does:
@@ -44,7 +45,8 @@ if [ "$(id -u)" -ne 0 ]; then echo "run with sudo"; exit 3; fi
 case "$ALIAS" in
   samsung) TV_IP="${SAMSUNG_IP:-}"; TV_NAME="Samsung" ;;
   google)  TV_IP="${GOOGLE_TV_IP:-}"; TV_NAME="Google TV" ;;
-  *) echo "usage: tv-offline-reconnect-test.sh <samsung|google> [offline-min] [post-min]"; exit 4 ;;
+  lg)      TV_IP="${LG_IP:-}"; TV_NAME="LG" ;;
+  *) echo "usage: tv-offline-reconnect-test.sh <samsung|google|lg> [offline-min] [post-min]"; exit 4 ;;
 esac
 [ -n "$TV_IP" ] || { echo "no IP for alias $ALIAS in config"; exit 4; }
 LAN="${LAN_SUBNET:-192.168.0.0/24}"
