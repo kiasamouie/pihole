@@ -9,12 +9,13 @@ Usage:
 Reads ADMIN_PASSWORD from .env (never printed). Read-only.
 """
 import json
+import os
 import sys
 import time
 import urllib.request
 
 BASE = "http://127.0.0.1:3001"
-ENV_FILE = "/home/kia/dns/.env"
+ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
 
 
 def get_password():

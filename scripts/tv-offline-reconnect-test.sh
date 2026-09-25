@@ -84,7 +84,7 @@ trap cleanup EXIT INT TERM
 PRE_CT=$(conntrack -L 2>/dev/null | grep -c "$TV_IP")
 if [ "$PRE_CT" -eq 0 ]; then
   echo "no active conntrack entries for $TV_IP - the TV may not be using this host as gateway right now."
-  echo "Set the TV gateway/DNS to the server first (ROUTER_NEXT_STEPS_V2.md), then re-run."
+  echo "Set the TV gateway/DNS to the server first (docs/ROUTER_NEXT_STEPS_V2.md), then re-run."
   echo "(no rule was added - nothing to roll back)"
   exit 5
 fi

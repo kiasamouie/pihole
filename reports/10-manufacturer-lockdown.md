@@ -123,4 +123,4 @@ One command: `sudo scripts/privacy-policy-disable.sh`. Removes the deny/DoT
 rules (table re-render, privacy state off), deletes group TVGuard-Privacy with
 all 70 rows (37 exact + 14 regex + **19 allow rows**) and the client
 attachment. NAT, masquerade, DNS DNAT, monitor mode, UFW, Docker, other
-Pi-hole groups untouched. See ROLLBACK.md §R0a.
+Pi-hole groups untouched. See docs/ROLLBACK.md §R0a.

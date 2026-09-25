@@ -142,7 +142,7 @@ grep -E '^(MODE|LAN_INTERFACE|LAN_SUBNET|GATEWAY_IP|UPSTREAM_ROUTER|TVS|WAN_INTE
   config/tvguard.conf 2>/dev/null | sed 's/^/  /'
 echo
 echo "  * LAN_INTERFACE/LAN_SUBNET/GATEWAY_IP must match THIS machine's interface and IP"
-echo "  * Reserve this box's IP in the router (see ROUTER_NEXT_STEPS_V2.md)"
+echo "  * Reserve this box's IP in the router (see docs/ROUTER_NEXT_STEPS_V2.md)"
 echo "  * TVGuard is NOT active: run scripts/tvguard-enable-monitor.sh when ready"
 echo "  * Nothing was pointed at this box; no routing/NAT is in effect yet"
 [ "$FAIL" -eq 0 ] || echo

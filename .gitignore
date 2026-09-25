@@ -16,7 +16,7 @@ captures/
 config/tvguard.conf
 
 # Local scratch
-data/*.tmp
+*.tmp
 .DS_Store
 reports/raw/ra-capture-*.txt
 

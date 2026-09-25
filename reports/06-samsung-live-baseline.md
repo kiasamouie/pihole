@@ -215,7 +215,7 @@ Review table only — **nothing here is blocked or scheduled to be blocked witho
 
 1. **Re-run three sessions with real interaction:** `plex` (open the Plex app, play something), `voice` (use the Bixby mic on the remote), `standby` (actually power the TV off, wait, power on). Same commands: `sudo scripts/tv-session.sh samsung <label> 10m`.
 2. Optionally add an `amazonvideo` session (Prime Video app) to characterise the a2z domains.
-3. Review `REVIEW_BEFORE_BLOCKING.md` with ChatGPT.
+3. Review `docs/REVIEW_BEFORE_BLOCKING.md` with ChatGPT.
 4. Suggested **future** test-block order (one at a time, each with a breakage watch, TV function re-checked after each): ACR (`log-ingestion-eu` + `log-config.samsungacr.com`) → doubleclick → adgrx → samsungads → panelresearch → nrdp → qoe. Voice-related and unknowns come last or not at all, and only after real voice/standby baselines exist.
 5. Alternative/complement: disable ACR in the TV's own settings if the user prefers a TV-side fix over a network block.
 6. Keep monitoring in MONITOR mode until the review is done. No blocking until the user says so.

@@ -18,16 +18,17 @@ Clients (from reports/02-lan-inventory.md):
   192.168.0.90   Google TV Streamer ("Living Room TV")     -> TV-Monitor
   192.168.0.225  "dgiot" (Shenzhen Bilian IoT)             -> IoT
 
-Reads ADMIN_PASSWORD from /home/kia/dns/.env (never printed).
+Reads ADMIN_PASSWORD from the repo's .env (located next to this script; never printed).
 """
 import json
+import os
 import sys
 import time
 import urllib.request
 import urllib.error
 
 BASE = "http://127.0.0.1:3001"
-ENV_FILE = "/home/kia/dns/.env"
+ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
 
 GROUPS = {
     "TV-Monitor": "TVs under observation (logging + default blocklist only)",

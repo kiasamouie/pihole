@@ -166,10 +166,10 @@ scoped entry → mock-test → re-apply → reset conntrack → re-test.
 - Selftest additions: suffix-regex content assertions (senv has exactly the
   aibixby.com suffix; standard has none; strict has it) + regex mock-client
   block test.
-- `REGRESSIONS.md` (R-001, R-002) so this failure cannot be forgotten.
+- `docs/REGRESSIONS.md` (R-001, R-002) so this failure cannot be forgotten.
 
 ## 9. Verification protocol
 
-See `VOICE_BLOCK_VERIFICATION.md` (one command:
+See `docs/VOICE_BLOCK_VERIFICATION.md` (one command:
 `sudo scripts/voice-proof-capture.sh`, then three physical voice questions;
 expected: all three cloud answers fail, everything else works).

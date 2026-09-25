@@ -172,7 +172,7 @@ one-arm PoC, conntrack + nft counters + the Pi-hole API + tshark cover every
 question we have (who, where, how much, which DNS name). Zeek/ntopng become
 worthwhile when (a) many devices traverse the box, (b) long-term storage
 correlation is needed, (c) the dedicated box takes the role. Revisit at
-migration; see `MIGRATION_TO_DEDICATED_BOX.md`.
+migration; see `docs/MIGRATION_TO_DEDICATED_BOX.md`.
 
 Caveat recorded in every session summary: conntrack reports cumulative bytes
 only at flow DESTROY, so flows still open at the end of a short window show

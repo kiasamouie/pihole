@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pi-hole v6 local API self-test (runs on the server itself).
 
-Reads ADMIN_PASSWORD from /home/kia/dns/.env (never printed). Tests:
+Reads ADMIN_PASSWORD from the repo's .env (located next to this script; never printed). Tests:
   1. login -> session SID (POST /api/auth)
   2. resolver health (upstreams + gravity via /api/info)
   3. add denylist entry for a real domain, verify it blocks (dig -> NXDOMAIN)
@@ -22,6 +22,7 @@ Pi-hole v6 (FTL >= 6.x) API paths:
 Exit code 0 = all passed.
 """
 import json
+import os
 import re
 import subprocess
 import sys
@@ -30,7 +31,7 @@ import urllib.request
 import urllib.error
 
 BASE = "http://127.0.0.1:3001"
-ENV_FILE = "/home/kia/dns/.env"
+ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
 # Must be a real domain that was NOT resolved recently, so the block test
 # is not answered from dnsmasq's cache (cached answers bypass the denylist).
 TEST_DOMAIN = "iana.org"
@@ -114,13 +115,21 @@ def main():
         s2, blocked2, d2 = dig_status(TEST_DOMAIN)
         check("allowed query -> resolves", s2 == "NOERROR" and not blocked2, f"(got {d2})")
 
-    code, q = req("GET", "/api/queries?perPage=50")
-    rows = q.get("queries", [])
-    ours = [r for r in rows if r.get("domain") == TEST_DOMAIN]
-    # v6 uses status "DENYLIST" for list-blocked queries (v5 used "blocked")
-    blocked_seen = any(r.get("status") in ("blocked", "BLOCKED", "DENYLIST") for r in ours)
+    # The live query log moves fast on a busy LAN: fetch a wide window and
+    # retry briefly so our own test rows are not crowded out by TV traffic.
+    ours, blocked_seen = [], False
+    for _ in range(5):
+        code, q = req("GET", "/api/queries?perPage=100")
+        rows = q.get("queries", [])
+        mine = [r for r in rows if r.get("domain") == TEST_DOMAIN]
+        ours = mine if len(mine) > len(ours) else ours
+        # v6 uses status "DENYLIST" for list-blocked queries (v5 used "blocked")
+        blocked_seen = blocked_seen or any(r.get("status") in ("blocked", "BLOCKED", "DENYLIST") for r in ours)
+        if len(ours) >= 2 and blocked_seen:
+            break
+        time.sleep(1.5)
     check("query log captured test queries", len(ours) >= 2 and blocked_seen,
-          f"(selftest rows {len(ours)}/{len(rows)}, denied-status row seen: {blocked_seen})")
+          f"(selftest rows {len(ours)} seen, denied-status row seen: {blocked_seen})")
 
     print("\nALL PASS" if ok else "\nSOME TESTS FAILED")
     sys.exit(0 if ok else 1)

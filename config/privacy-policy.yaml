@@ -21,7 +21,7 @@
 #   strict            = standard-no-voice + lower-confidence telemetry +
 #                       known-DoH-endpoint IP blocking.
 #
-# Rules followed when building this list (see reports/07 and FINAL_BLOCKING_PLAN.md):
+# Rules followed when building this list (see reports/07 and docs/FINAL_BLOCKING_PLAN.md):
 #   * EXACT domains only. No *.samsung.com / *.samsungcloudsolution.com style
 #     wildcards - those families contain app-store, auth, EPG, update and
 #     QBE infrastructure whose blockage is documented by the community.

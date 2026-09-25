@@ -23,6 +23,15 @@ set -uo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then echo "run with sudo"; exit 3; fi
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# GATEWAY_IP for the SNAT evidence check: from config when present, fallback to
+# the documented default (repo lives on any path; nothing else is hardcoded).
+GW_CHECK=192.168.0.128
+if [ -f "$ROOT/config/tvguard.conf" ]; then
+  GW_CHECK=$(sed -n 's/^GATEWAY_IP=//p' "$ROOT/config/tvguard.conf" | head -1)
+  [ -n "$GW_CHECK" ] || GW_CHECK=192.168.0.128
+fi
+
 NS=tvg; VETH_HG=veth-hg; VETH_TV=veth-tv
 NSIP=10.99.99.2; HOSTIP=10.99.99.1
 LAN=192.168.0.0/24
@@ -124,9 +133,9 @@ else
 fi
 
 # Confirm Pi-hole logged it as client 10.99.99.2 (per-TV attribution of the bypass)
-if command -v python3 >/dev/null 2>&1 && [ -f /home/kia/dns/.env ]; then
+if command -v python3 >/dev/null 2>&1 && [ -f "$ROOT/.env" ]; then
   sleep 1
-  PW=$(grep '^ADMIN_PASSWORD=' /home/kia/dns/.env 2>/dev/null | cut -d= -f2)
+  PW=$(grep '^ADMIN_PASSWORD=' "$ROOT/.env" 2>/dev/null | cut -d= -f2)
   # Pi-hole v6 API: the session id is in the JSON body (no X-FTL-SID response header).
   SID=$(curl -sk -m 10 -X POST "http://$PIHOLE:3001/api/auth" -H "Content-Type: application/json" -d "{\"password\":\"$PW\"}" 2>/dev/null \
         | python3 -c 'import sys,json; print(json.load(sys.stdin)["session"]["sid"])' 2>/dev/null)
@@ -154,8 +163,8 @@ echo
 echo "=== conntrack evidence (mock TV egress NAT mapping) ==="
 CT=$(conntrack -L 2>/dev/null | grep -E "$NSIP" | grep -v 255 | head -3)
 echo "${CT:-  (no NATed conntrack entries found)}" | sed 's/^/  /'
-if echo "${CT:-}" | grep -q "dst=192.168.0.128"; then
-  ok "return traffic is NATed back through this host (dst=192.168.0.128)"
+if echo "${CT:-}" | grep -q "dst=$GW_CHECK"; then
+  ok "return traffic is NATed back through this host (dst=$GW_CHECK)"
 else
   no "no evidence of SNAT return path through this host"
 fi
