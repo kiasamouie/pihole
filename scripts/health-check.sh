@@ -4,6 +4,9 @@
 #
 # Usage: scripts/health-check.sh
 set -uo pipefail
+# sbin tools (nft, ufw, sysctl, conntrack) are needed on any
+# PATH flavor this script may be invoked from (cron, agents, CI).
+export PATH="/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"
@@ -20,6 +23,8 @@ fail=0
 say(){ printf "%-58s %s\n" "$1" "$2"; }
 pass(){ say "$1" "OK${2:+ ($2)}"; }
 fail_check(){ say "$1" "FAIL${2:+ ($2)}"; fail=1; }
+# WARN = cannot be verified from this privilege level; not a failure
+warn(){ say "$1" "WARN${2:+ ($2)}"; }
 
 run_root() {
     if [ "$(id -u)" -eq 0 ]; then
@@ -137,12 +142,26 @@ echo
 echo "=== TVGuard ==="
 active=0
 table_present=0
+table_unknown=0
 [ -f "$STATE_DIR/active" ] && active=1
-if command -v nft >/dev/null 2>&1 && run_root nft list table ip tvguard >/dev/null 2>&1; then
-    table_present=1
+# Privileged probes (nft/iptables) need root or cached sudo credentials.
+# Without either, the outcome is UNKNOWN: report WARN instead of treating
+# "cannot read" as "absent" (false FAIL in non-interactive shells).
+root_probe_ok=0
+if [ "$(id -u)" -eq 0 ]; then
+    root_probe_ok=1
+elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+    root_probe_ok=1
+fi
+if [ "$root_probe_ok" -eq 1 ] && command -v nft >/dev/null 2>&1; then
+    run_root nft list table ip tvguard >/dev/null 2>&1 && table_present=1
+else
+    table_unknown=1
 fi
 
-if [ "$active" -eq 1 ] && [ "$table_present" -eq 1 ]; then
+if [ "$table_unknown" -eq 1 ]; then
+    warn "tvguard active marker and nft table" "run with sudo to verify nft state"
+elif [ "$active" -eq 1 ] && [ "$table_present" -eq 1 ]; then
     pass "tvguard active marker and nft table" "consistent"
 elif [ "$active" -eq 0 ] && [ "$table_present" -eq 0 ]; then
     pass "tvguard active marker and nft table" "disabled consistently"
@@ -153,12 +172,17 @@ else
 fi
 
 ufw_rules=""
-if command -v iptables >/dev/null 2>&1; then
+ufw_unknown=0
+if [ "$root_probe_ok" -eq 1 ] && command -v iptables >/dev/null 2>&1; then
     ufw_rules=$(run_root iptables -t filter -S ufw-user-forward 2>/dev/null || true)
+else
+    ufw_unknown=1
 fi
 for tv in $TVS; do
     tv_re=${tv//./\\.}
-    if printf '%s\n' "$ufw_rules" | grep -Eq -- "-s $tv_re(/32)? .* -j ACCEPT|-s $tv_re(/32)? -j ACCEPT"; then
+    if [ "$ufw_unknown" -eq 1 ]; then
+        warn "UFW route allowance for $tv" "run with sudo to verify"
+    elif printf '%s\n' "$ufw_rules" | grep -Eq -- "-s $tv_re(/32)? .* -j ACCEPT|-s $tv_re(/32)? -j ACCEPT"; then
         [ "$active" -eq 1 ] \
             && pass "UFW route allowance for $tv" \
             || fail_check "UFW route allowance for $tv" "stale rule while TVGuard is disabled"
