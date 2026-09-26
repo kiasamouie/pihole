@@ -109,6 +109,9 @@ for line in open(path):
         continue
     if s.startswith(("APPLIED_AT=", "SOURCE=", "DISABLED_AT=")):
         continue
+    if s.startswith(("APPLIED_AT_%s=" % vendor.upper(),
+                     "DISABLED_AT_%s=" % vendor.upper())):
+        continue
     if s.startswith("PRIVACY-%s=" % vendor):
         continue
     keep.append(s)
