@@ -10,18 +10,18 @@ The architecture is identical to the accepted Samsung deployment:
 ```
 LG webOS TV  (TBD IP)
      |
-     | gateway + DNS (192.168.0.128)
+     | gateway + DNS (<TVGUARD_IP>)
      v
-kiaserver: Pi-hole (group TVGuard-Privacy-LG) + TVGuard nftables (tv_privacy_lg)
+TVGuard box: Pi-hole (group TVGuard-Privacy-LG) + TVGuard nftables (tv_privacy_lg)
      |
      v
-Virgin Hub -> Internet
+upstream router -> Internet
 ```
 
 The LG policy is a **separate vendor instance** from Samsung (disjoint config,
 resolved section, nftables sets, Pi-hole group, state line). Samsung
-`manufacturer-lockdown` on `192.168.0.197` is live and untouched; Google TV
-`192.168.0.90` is outside both client scopes.
+`manufacturer-lockdown` on `<SAMSUNG_TV_IP>` is active and untouched; Google TV
+`<GOOGLE_TV_IP>` is outside both client scopes.
 
 Profiles (built per vendor by `scripts/privacy-policy-build.py`):
 
@@ -146,8 +146,9 @@ security updates, TV Plus/EPG (if used), time sync, ordinary HTTPS + QUIC.
 
 1. `arp-scan` / neighbour table / SSDP / Pi-hole clients → confirm LG MAC + IP
    (vendor check: OUI must be LG, not another household device).
-2. Add the IP to `config/lgtv/privacy-policy.yaml` → `applies_to` and to
-   `LG_IP=`/`TVS` in the ignored `config/tvguard.conf`.
+2. Add the IP to `LG_TVS=` (and `TVS=`) in the ignored `.env` — the policy
+   build resolves the target from the machine config (policy YAMLs carry no
+   `applies_to`).
 3. Rebuild + render TVGuard (atomic `nft -c` → replace; per-vendor LG sets
    only — Samsung sets untouched).
 4. Capture a local baseline (DNS history, flows, persistent connections,

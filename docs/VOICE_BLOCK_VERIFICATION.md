@@ -6,7 +6,7 @@ with hard network evidence captured automatically.
 Preconditions (all already true, re-check in 30 s):
 
 ```bash
-cd /home/kia/dns
+cd <repo-root>
 sudo scripts/tvguard-status.sh        # PRIVACY=standard-no-voice, MODE=monitor
 scripts/health-check.sh               # all green
 ```
@@ -22,7 +22,7 @@ continue the voice test on a broken baseline.
 ### 2. Run the proof capture (ONE command, 7 minutes)
 
 ```bash
-cd /home/kia/dns
+cd <repo-root>
 sudo scripts/voice-proof-capture.sh
 ```
 

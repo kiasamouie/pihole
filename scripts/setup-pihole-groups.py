@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
-"""Idempotent Pi-hole v6 group/client provisioning (Phase 6).
+"""Idempotent Pi-hole v6 group/client provisioning.
 
-Creates per-device policy groups and registers the LAN devices that will
-use them. Safe to re-run: existing groups/clients are reused, missing ones
-are added, group membership is reconciled.
+Creates per-device policy groups and registers the TV clients from the
+machine config (.env or config/tvguard.conf) that will use them. Safe to
+re-run: existing groups/clients are reused, missing ones are added, group
+membership is reconciled. Nothing household-specific is hardcoded: the
+client list is exactly TVS from the machine config, tagged TV-Monitor.
 
 Groups:
   Default    (id 0, built-in)  - everything not explicitly grouped
   TV-Monitor - TVs under observation: logging, default blocklist, no custom denies
   TV-Strict  - TVs once allow/block tuning is proven: stricter list set
-  IoT        - IoT devices (e.g. .225)
+  IoT        - IoT devices (add them manually via the API/UI if needed)
   Trusted    - computers/phones that should get minimal or no filtering
   Testing    - experimental policies / test clients
-
-Clients (from reports/02-lan-inventory.md):
-  192.168.0.197  Samsung QE65Q75CATXXU (65" Q75A, Tizen)  -> TV-Monitor
-  192.168.0.90   Google TV Streamer ("Living Room TV")     -> TV-Monitor
-  192.168.0.225  "dgiot" (Shenzhen Bilian IoT)             -> IoT
 
 Reads ADMIN_PASSWORD from the repo's .env (located next to this script; never printed).
 """
@@ -27,8 +24,14 @@ import time
 import urllib.request
 import urllib.error
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from tvguard_target_config import TargetConfigError, load_target_config
+import yaml
+
 BASE = "http://127.0.0.1:3001"
-ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
+HERE = os.path.dirname(os.path.abspath(__file__))
+ENV_FILE = os.path.join(HERE, "..", ".env")
+INSTANCES = os.path.join(HERE, "..", "config", "privacy-instances.yaml")
 
 GROUPS = {
     "TV-Monitor": "TVs under observation (logging + default blocklist only)",
@@ -37,11 +40,17 @@ GROUPS = {
     "Trusted":    "Trusted computers/phones (minimal or no filtering)",
     "Testing":    "Experimental policies and test devices",
 }
-CLIENTS = {
-    "192.168.0.197": ("Samsung QE65Q75A (Tizen)", ["TV-Monitor"]),
-    "192.168.0.90":  ("Google TV Streamer (Living Room)", ["TV-Monitor"]),
-    "192.168.0.225": ("dgiot (Bilian IoT)", ["IoT"]),
-}
+
+def get_clients():
+    """Every TV in the machine config's TVS -> TV-Monitor (no hardcoding)."""
+    try:
+        with open(INSTANCES, encoding="utf-8") as fh:
+            instances = (yaml.safe_load(fh) or {}).get("instances") or {}
+        tc = load_target_config(instances)
+    except TargetConfigError as exc:
+        print("note: no machine config usable (%s) - registering no clients" % exc)
+        return {}
+    return {ip: ("TV (TVS entry)", ["TV-Monitor"]) for ip in tc.tvs}
 
 SID = None
 
@@ -94,22 +103,34 @@ def main():
             print(f"group  {name:<12} FAILED (http {code}): {res}")
             return 1
 
+    clients = get_clients()
+    if not clients:
+        print("note: TVS is empty in the machine config - no clients registered")
     # clients: GET /api/clients -> {"clients":[{ip,name,groups:[ids],...}]}
     code, body = req("GET", "/api/clients")
     cmap = {c["client"]: c for c in body.get("clients", [])}
-    for ip, (name, gnames) in CLIENTS.items():
+    inames = {v: k for k, v in gmap.items()}
+    for ip, (name, gnames) in clients.items():
         groups = [gmap[g] for g in gnames if g in gmap]
         # v6 schema: clients have no name column; label goes in comment
-        payload = {"client": ip, "comment": name, "groups": groups}
         if ip in cmap:
+            # MERGE, never replace: keep the client's existing groups (e.g.
+            # TVGuard-Privacy) and only add the missing desired ones.
+            # Replacing the group list here would silently detach a TV from
+            # its privacy group.
             existing = cmap[ip]
-            if (sorted(existing.get("groups", [])) != sorted(groups)
+            have = list(existing.get("groups", []))
+            want = have + [g for g in groups if g not in have]
+            payload = {"client": ip, "comment": name, "groups": want}
+            gl = [inames.get(g, str(g)) for g in want]
+            if (sorted(have) != sorted(want)
                     or (existing.get("comment") or "") != name):
                 code, _ = req("PUT", f"/api/clients/{ip}", payload)
-                print(f"client {ip:<16} updated -> {gnames} (http {code})")
+                print(f"client {ip:<16} updated -> {gl} (http {code})")
             else:
-                print(f"client {ip:<16} exists, groups OK ({gnames})")
+                print(f"client {ip:<16} exists, groups OK ({gl})")
         else:
+            payload = {"client": ip, "comment": name, "groups": groups}
             code, res = req("POST", "/api/clients", payload)
             if code in (200, 201):
                 print(f"client {ip:<16} created -> {gnames} (http {code})")

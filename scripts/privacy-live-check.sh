@@ -17,6 +17,10 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"
 STATE_DIR=/var/lib/tvguard
+# Machine config (TVGUARD_ENV > $ROOT/.env > legacy config/tvguard.conf).
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/_tvguard_env.sh" || exit 4
+LAN_PREFIX="${LAN_SUBNET%/*}."
 PASS=0; FAIL=0
 ok(){ echo "  PASS: $1"; PASS=$((PASS+1)); }
 no(){ echo "  FAIL: $1"; FAIL=$((FAIL+1)); }
@@ -173,15 +177,16 @@ PYEOF
 
   echo
   echo "=== TV path + keeps ($V) ==="
-  V="$V" RES="$ROOT/data/privacy-policy/resolved.json" python3 - <<'PYEOF'
+  V="$V" RES="$ROOT/data/privacy-policy/resolved.json" LAN_PREFIX="$LAN_PREFIX" python3 - <<'PYEOF'
 import json, os, re, subprocess, sys
 ROOT = os.environ["RES"]
 d = json.load(open(ROOT))
 v = os.environ["V"]
 vs = d["vendors"][v]
+lan = os.environ.get("LAN_PREFIX", "")
 for ip in vs.get("applies_to", []):
     out = subprocess.run(["conntrack", "-L"], capture_output=True, text=True).stdout
-    hits = [l for l in out.splitlines() if ip in l and "192.168.0." not in l.replace(ip, "")][:3]
+    hits = [l for l in out.splitlines() if ip in l and (not lan or lan not in l.replace(ip, ""))][:3]
     if hits:
         print("  PASS: %s has active NATed connections through this host" % ip)
         for h in hits: print("    " + h)

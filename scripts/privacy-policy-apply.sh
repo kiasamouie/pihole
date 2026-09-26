@@ -13,11 +13,11 @@
 # and state line (PRIVACY-<vendor>=<tier>). Applying one vendor never touches
 # the other vendor's policy, state or Pi-hole group.
 #
-# Testability overrides (documented, default to production values):
+# Testability override:
 #   PRIVACY_GROUP   Pi-hole group name for the apply (default: the vendor's
 #                   group from config/privacy-instances.yaml)
-#   PRIVACY_TARGETS space-separated client IPs to scope the policy to
-#                   (default: the vendor's `applies_to` list from its policy)
+# Target scope has no independent override: TVGUARD_CONFIG must point at a
+# complete fixture so compiler, firewall and Pi-hole scope stay identical.
 #
 # What it does (all reversible via privacy-policy-disable.sh [vendor]):
 #   1. Re-resolves ALL vendor policies -> data/privacy-policy/resolved.json
@@ -30,7 +30,7 @@
 #      external :53 forcing DNAT are added for the vendor's target TVs only.
 #   3. Pushes the tier's exact-domain denies AND regex (suffix) denies (and,
 #      for manufacturer-lockdown, the vendor's essential-allow rows) into the
-#      vendor's dedicated Pi-hole group, scoped to the applies_to clients.
+#      vendor's dedicated Pi-hole group, scoped to its configured targets.
 #
 # It NEVER: flushes nftables/iptables, touches UFW or Docker, changes TVGuard
 # monitor mode, enables DHCP, or blocks anything outside the target TVs.
@@ -63,36 +63,34 @@ case "$TIER" in
   *) echo "usage: privacy-policy-apply.sh <vendor> <standard|standard-no-voice|strict|manufacturer-lockdown>" >&2; exit 4 ;;
 esac
 
-# vendor metadata from the registry (tab-separated: vendor, group, applies_to csv)
-VENDOR_META="$(VENDOR="$VENDOR" python3 - "$ROOT/config/privacy-instances.yaml" <<'PYEOF'
-import os, sys
-import yaml
-inst = (yaml.safe_load(open(sys.argv[1])).get("instances") or {})
-v = os.environ["VENDOR"]
-if v not in inst:
-    sys.exit("unknown vendor %s (known: %s)" % (v, ", ".join(inst)))
-cfg = inst[v]
-pol = yaml.safe_load(open(os.path.join(os.path.dirname(os.path.dirname(sys.argv[1])), cfg["policy"])))
-targets = [str(x) for x in (pol.get("applies_to") or [])]
-print("\t".join([v, cfg.get("pihole_group", "TVGuard-Privacy-%s" % v.upper()), ",".join(targets)]))
-PYEOF
-)" || exit 4
-IFS=$'\t' read -r VENDOR META_GROUP META_TARGETS <<< "$VENDOR_META"
-# documented test override: PRIVACY_GROUP env wins (mock cycles use throwaway groups)
+# Vendor metadata and targets come from the registry + machine config.
+VENDOR_META="$(python3 "$SCRIPT_DIR/tvguard_target_config.py" \
+  --instances "$ROOT/config/privacy-instances.yaml" vendor-meta "$VENDOR")" || exit 4
+IFS=$'\t' read -r META_GROUP TARGETS_KEY META_TARGETS <<< "$VENDOR_META"
+# Documented test override: PRIVACY_GROUP may select a throwaway Pi-hole group.
 PRIVACY_GROUP="${PRIVACY_GROUP:-$META_GROUP}"
-VENDOR_TARGETS="$META_TARGETS"
+CONFIGURED_TARGETS="${META_TARGETS//,/ }"
 
-[ -n "$VENDOR_TARGETS" ] || {
-  echo "ERROR: vendor '$VENDOR' has an empty applies_to list in its policy file." >&2
-  echo "The vendor is inactive: no client has been assigned. Add the TV's IP to" >&2
-  echo "the vendor's policy file (applies_to) AND to TVS in config/tvguard.conf first." >&2
+[ -n "$CONFIGURED_TARGETS" ] || {
+  echo "ERROR: vendor '$VENDOR' is inactive because $TARGETS_KEY is empty." >&2
+  echo "Add the vendor TV address(es) to $TARGETS_KEY and TVS in config/tvguard.conf" >&2
+  echo "(or in the file selected by TVGUARD_CONFIG) before applying privacy." >&2
   exit 5
 }
-PRIVACY_TARGETS="${PRIVACY_TARGETS:-${VENDOR_TARGETS//,/ }}"
 
 # 1. fresh resolution (all vendors; uses 8.8.8.8, never the local Pi-hole)
 echo "== resolving policy via external resolver (vendor: $VENDOR, tier: $TIER) =="
 python3 "$SCRIPT_DIR/privacy-policy-build.py" || { echo "build failed; nothing applied." >&2; exit 5; }
+VENDOR_TARGETS="$(python3 "$SCRIPT_DIR/tvguard_target_config.py" \
+  --instances "$ROOT/config/privacy-instances.yaml" resolved-targets \
+  "$ROOT/data/privacy-policy/resolved.json" "$VENDOR")" || {
+  echo "resolved target validation failed; nothing applied." >&2
+  exit 5
+}
+[ -n "$VENDOR_TARGETS" ] || {
+  echo "ERROR: vendor '$VENDOR' resolved with no targets; nothing applied." >&2
+  exit 5
+}
 
 # 2. firewall part (re-renders only table ip tvguard; per-vendor state line)
 echo
@@ -128,11 +126,11 @@ bash "$SCRIPT_DIR/tvguard-apply.sh" || {
   exit 6
 }
 
-# 3. Pi-hole part (vendor's dedicated group, scoped to applies_to clients)
+# 3. Pi-hole part (vendor's dedicated group, scoped to resolved config targets)
 echo
 echo "== pushing domains to Pi-hole group $PRIVACY_GROUP (vendor $VENDOR) =="
-PRIVACY_ROOT="$ROOT" PRIVACY_VENDOR="$VENDOR" PRIVACY_TIER="$TIER" PRIVACY_GROUP="$PRIVACY_GROUP" PRIVACY_TARGETS="$PRIVACY_TARGETS" python3 - <<'PYEOF'
-import json, os, re, sys, time, urllib.request, urllib.error, yaml
+PRIVACY_ROOT="$ROOT" PRIVACY_VENDOR="$VENDOR" PRIVACY_TIER="$TIER" PRIVACY_GROUP="$PRIVACY_GROUP" python3 - <<'PYEOF'
+import json, os, re, sys, time, urllib.request, urllib.error
 
 ROOT = os.environ["PRIVACY_ROOT"]
 VENDOR = os.environ["PRIVACY_VENDOR"]
@@ -150,10 +148,12 @@ vendor = (resolved.get("vendors") or {}).get(VENDOR)
 if vendor is None:
     sys.exit("resolved.json has no vendor section for %s (run the build first)" % VENDOR)
 section = vendor[TIER]
-targets = [t for t in os.environ.get("PRIVACY_TARGETS", "").split() if t] or vendor["applies_to"]
+targets = vendor.get("applies_to") or []
+if not targets:
+    sys.exit("resolved target list for %s is empty; refusing Pi-hole apply" % VENDOR)
 domains = section["domains"]
 regexes = [r["pattern"] for r in (section.get("regexes") or [])]
-print("  targets (applies_to): %s" % ", ".join(targets))
+print("  targets: %s" % ", ".join(targets))
 
 SID = None
 def req(method, path, body=None):
@@ -331,6 +331,6 @@ PYEOF
 
 echo
 echo "== done =="
-echo "Tier $TIER is now ACTIVE for vendor $VENDOR: ${PRIVACY_TARGETS}"
+echo "Tier $TIER is now ACTIVE for vendor $VENDOR: ${VENDOR_TARGETS}"
 echo "Verify:  sudo scripts/privacy-policy-status.sh"
 echo "Undo:    sudo scripts/privacy-policy-disable.sh $VENDOR"

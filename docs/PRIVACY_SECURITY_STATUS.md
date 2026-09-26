@@ -1,6 +1,6 @@
 # Privacy / security status — Samsung .197 under manufacturer-lockdown
 
-Live as of 2026-09-22 10:54Z. No marketing language; each row is a control
+State as of the deployment on the TVGuard box. No marketing language; each row is a control
 claim about what this network layer can and cannot do.
 
 | Mechanism / vector | Status | Basis |
@@ -20,11 +20,11 @@ claim about what this network layer can and cannot do.
 | Direct-IP connections, dedicated Samsung infra | **CONTROLLED** | deny set is IP-based; raw-IP connections to a listed IP are dropped |
 | Direct-IP connections, shared cloud infra | **NOT CONTROLLED** | shared IPs cannot be dropped without collateral damage; hostname-level control only |
 | QUIC / UDP-443 | **NOT CONTROLLED (intentional)** | no rule touches it; required for streaming |
-| IPv6 | **NOT CURRENTLY APPLICABLE** | re-verified 2026-09-22: enp2s0 link-local only, accept_ra=0, no global v6 route; if a v6 path ever appears, re-check BEFORE claiming readiness |
+| IPv6 | **NOT CURRENTLY APPLICABLE** | re-verified on deployment: <LAN_INTERFACE> link-local only, accept_ra=0, no global v6 route; if a v6 path ever appears, re-check BEFORE claiming readiness |
 | Shared-CDN telemetry (e.g. googlevideo eligibility) | **PARTIALLY CONTROLLED** | DNS-level exact deny works; IP level kept out by design (keep wins) |
 | Cached DNS answers | **PARTIALLY CONTROLLED** | a blocked name resolves from cache until TTL expiry; `privacy-reset-tv-manufacturer-state.sh --flush-dns-cache` closes the gap on re-apply |
 | Persistent TLS connections (pre-existing) | **PARTIALLY CONTROLLED** | deny rules match `ct state new`; stale flows to newly-denied IPs are expired per-TV by the reset script (never a global flush) |
 | Offline-buffered upload (content) | **NOT PROVABLE** | network layer cannot read encrypted payloads; the tooling can only prove "X bytes to destination Y immediately after reconnect" |
 | Offline-buffered upload (detection) | **CONTROLLED (detection only)** | `tv-offline-reconnect-test.sh` measures deferred DNS/connection/upload bursts to Samsung/Bixby/telemetry destinations, fail-safe restore |
-| LAN access (TV → other 192.168.0.x, e.g. Plex) | **NOT CONTROLLED (accepted)** | egress policy only; LAN isolation is a later phase |
-| Other household clients (incl. Google TV .197/.90) | **NOT AFFECTED** | privacy rules scoped to `tv_privacy` = applies_to = {192.168.0.197}; verified 2026-09-22 (tv_privacy set + rule audit + UFW hash unchanged) |
+| LAN access (TV → other <LAN_SUBNET> hosts, e.g. Plex) | **NOT CONTROLLED (accepted)** | egress policy only; LAN isolation is a later phase |
+| Other household clients (incl. Google TV .197/.90) | **NOT AFFECTED** | privacy rules scoped to `tv_privacy` = applies_to = {<SAMSUNG_TV_IP>}; verified on deployment (tv_privacy set + rule audit + UFW hash unchanged) |

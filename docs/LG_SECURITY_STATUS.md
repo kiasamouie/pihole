@@ -23,7 +23,7 @@ this network layer can and cannot do.
 | Direct-IP to dedicated LG infra | **CONTROLLED** | IP-based deny set; raw-IP connections to listed IPs dropped |
 | Direct-IP to shared cloud infra | **NOT CONTROLLED** | shared IPs (AWS/Akamai/etc.) cannot be dropped without collateral; hostname-level control only |
 | QUIC / UDP-443 | **NOT CONTROLLED (intentional)** | no rule touches it; required for streaming |
-| IPv6 | **NOT CURRENTLY APPLICABLE** | previously verified: kiaserver uplink link-local only, no RA, no v6 default route. RE-CHECK after LG is discovered — if a v6 path appears, add equivalent controls before claiming readiness |
+| IPv6 | **NOT CURRENTLY APPLICABLE** | previously verified: TVGuard box uplink link-local only, no RA, no v6 default route. RE-CHECK after LG is discovered — if a v6 path appears, add equivalent controls before claiming readiness |
 | Shared-CDN telemetry | **PARTIALLY CONTROLLED** | exact-name DNS deny works; keep-list IPs kept out of the firewall deny by design (keep wins) |
 | Cached DNS answers | **PARTIALLY CONTROLLED** | blocked names resolve from cache until TTL expiry; `privacy-reset-tv-manufacturer-state.sh lg --flush-dns-cache` closes the gap |
 | Persistent TLS connections (pre-existing) | **PARTIALLY CONTROLLED** | denies match `ct state new`; stale flows expired per-TV by the reset script (never a global flush) |

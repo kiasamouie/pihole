@@ -23,6 +23,9 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"
 STATE_DIR=/var/lib/tvguard
+# Machine config (TVGUARD_ENV > $ROOT/.env > legacy config/tvguard.conf).
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/_tvguard_env.sh" || exit 4
 DUR="${1:-30}"
 AUTO=""
 [ "${2:-}" = "--auto-rollback" ] && AUTO=1
@@ -72,6 +75,16 @@ except Exception:
     pass')
 done
 PIHOLE_DEAD=0
+
+# Host service health is judged RELATIVELY: only services that were
+# listening at watch start (SSH, Plex, Samba, Transmission - whichever
+# exist on this box) must stay up. Optional services absent at start are
+# ignored, so the watch works on any host.
+HOST_PORTS=(22 32400 445 9091)
+declare -A HOST_WAS_UP
+for p in "${HOST_PORTS[@]}"; do
+  if ss -ltn 2>/dev/null | grep -q ":$p "; then HOST_WAS_UP[$p]=1; else HOST_WAS_UP[$p]=0; fi
+done
 
 get_counters(){
   nft -s list chain ip tvguard forward 2>/dev/null | awk '
@@ -132,10 +145,10 @@ PYEOF
   NEW=$(echo "$CTR" | awk '{print $1}'); PRIVC=$(echo "$CTR" | awk '{print $2}'); DOTC=$(echo "$CTR" | awk '{print $3}')
 
   HOSTOK=1
-  ss -ltn | grep -q ':13567 ' || HOSTOK=0   # SSH
-  ss -ltn | grep -q ':32400 ' || HOSTOK=0   # Plex
-  ss -ltn | grep -q ':445 ' || HOSTOK=0     # Samba
-  ss -ltn | grep -q ':9091 ' || HOSTOK=0    # Transmission
+  for p in "${HOST_PORTS[@]}"; do
+    [ "${HOST_WAS_UP[$p]}" = "1" ] || continue   # wasn't running at start: not our problem
+    ss -ltn 2>/dev/null | grep -q ":$p " || HOSTOK=0
+  done
   docker ps 2>/dev/null | grep -q pihole || HOSTOK=0
 
   printf "%s  pihole=%s q=%s blocked=%s | tvconntrack:%s | NEW=%s PRIV=%s DOT=%s | host=%s\n" \
@@ -174,7 +187,7 @@ echo
 echo "watch finished: $(date -u +%H:%M:%S) UTC"
 echo
 echo "Review candidates (manual, from the Pi-hole UI):"
-echo "  * blocked queries per domain:  http://192.168.0.128:3001 (Queries tab)"
+echo "  * blocked queries per domain:  http://${PIHOLE_IP:-127.0.0.1}:3001 (Queries tab)"
 echo "  * unknown vendor egress (manufacturer-lockdown):"
 echo "      sudo scripts/show-unknown-samsung.sh samsung 24   |   ... lg 24"
 echo "    then: sudo scripts/manufacturer-review.sh <vendor> keep <domain> [reason]   (or: block <domain> [reason])"

@@ -50,15 +50,17 @@ done
 
 if [ -z "$TV" ]; then
   TV=$(VENDOR_ROOT="$ROOT" VENDOR="$VENDOR" python3 -c '
-import os
-import yaml
-inst = yaml.safe_load(open(os.environ["VENDOR_ROOT"] + "/config/privacy-instances.yaml"))["instances"][os.environ["VENDOR"]]
-doc = yaml.safe_load(open(os.environ["VENDOR_ROOT"] + "/" + inst["policy"]))
-t = (doc.get("applies_to") or ["192.168.0.197"])
+import os, sys, yaml
+sys.path.insert(0, os.environ["VENDOR_ROOT"] + "/scripts")
+from tvguard_target_config import load_target_config
+root = os.environ["VENDOR_ROOT"]; v = os.environ["VENDOR"]
+inst = yaml.safe_load(open(root + "/config/privacy-instances.yaml"))["instances"]
+tc = load_target_config(inst)
+t = tc.vendor_targets.get(v) or []
 print(t[0] if t else "")
 ')
 fi
-[ -n "$TV" ] || { echo "vendor $VENDOR has no applies_to client - pass the TV IP explicitly" >&2; exit 5; }
+[ -n "$TV" ] || { echo "vendor $VENDOR has no configured TV target - pass the TV IP explicitly" >&2; exit 5; }
 if [ -z "$SECTION" ]; then
   SECTION=manufacturer-lockdown
 fi

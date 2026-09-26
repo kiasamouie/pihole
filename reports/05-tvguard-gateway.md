@@ -1,8 +1,8 @@
-# 05 — TVGuard one-arm gateway PoC (nftables egress control on kiaserver)
+# 05 — TVGuard one-arm gateway PoC (nftables egress control on the deployment box)
 
 Date: 2026-09-20 (UTC)
 Scope: everything the repo ships for the one-arm gateway role, proven on this
-machine **without** changing any TV, the Hub, or any pre-existing service.
+machine **without** changing any TV, the upstream router, or any pre-existing service.
 
 The intended architecture is NOT "Pi-hole now, firewall later on another box".
 This is the **complete** privacy/monitoring/firewall PoC: Pi-hole + per-device
@@ -15,38 +15,38 @@ merely inherits this repository.
 ## 1. Design: one-arm gateway (same-interface routing + masquerade)
 
 ```
-Samsung .197 / Google TV .90           (TV gateway = DNS = 192.168.0.128)
+Samsung <SAMSUNG_TV_IP> / Google TV <GOOGLE_TV_IP>           (TV gateway = DNS = <TVGUARD_IP>)
         |
-        |  default route via .128, DNS .128
+        |  default route via <TVGUARD_IP>, DNS <TVGUARD_IP>
         v
-kiaserver (enp2s0, 192.168.0.128)     one NIC, one arm
+this box (<LAN_INTERFACE>, <TVGUARD_IP>)     one NIC, one arm
   * ip_forward=1
   * prerouting:  TV -> :53 (except our IP)  DNAT -> 172.18.0.2:53 (Pi-hole)
   * forward:     TV -> non-LAN  accept (+ log NEW)     [tvguard, prio -150]
                  UFW ufw-user-forward: -s <tv> -j ACCEPT   (the real accept)
-  * postrouting: TV -> non-LAN  MASQUERADE (out via enp2s0)
+  * postrouting: TV -> non-LAN  MASQUERADE (out via <LAN_INTERFACE>)
         |
-        v   source = 192.168.0.128
-Virgin Hub .1  ->  Internet
+        v   source = <TVGUARD_IP>
+the upstream router .1  ->  Internet
         |
-        v   reply dst=192.168.0.128 -> conntrack reverse-NATs -> TV
+        v   reply dst=<TVGUARD_IP> -> conntrack reverse-NATs -> TV
 ```
 
 Why this is a correct one-arm design (verified, not assumed):
 
 * **Forwarding on the same interface**: Linux routes by FIB, not by "interface
-  pairs". A packet from `192.168.0.197` to a non-LAN destination is looked up
-  in the routing table (`default via 192.168.0.1`), accepted for forwarding
+  pairs". A packet from `<SAMSUNG_TV_IP>` to a non-LAN destination is looked up
+  in the routing table (`default via <UPSTREAM_ROUTER_IP>`), accepted for forwarding
   because `ip_forward=1`, and goes out the same NIC. Two NICs are NOT required
   for a same-segment gateway.
-* **Return path**: MASQUERADE rewrites the source to `192.168.0.128`, so
+* **Return path**: MASQUERADE rewrites the source to `<TVGUARD_IP>`, so
   Internet replies come back to THIS host; conntrack performs the reverse NAT
   and the reply is delivered to the TV. Proven in the selftest (conntrack shows
-  `dst=192.168.0.128` mappings for the mock TV's traffic).
+  `dst=<TVGUARD_IP>` mappings for the mock TV's traffic).
 * **ICMP redirects**: a host that forwards a packet "out the same interface it
   came in, toward a destination on a different network" must NOT send ICMP
   redirects, or the TV would be told ".1 is closer" and abandon our gateway.
-  `net.ipv4.conf.enp2s0.send_redirects=0` is therefore set and persisted
+  `net.ipv4.conf.<LAN_INTERFACE>.send_redirects=0` is therefore set and persisted
   (`/etc/sysctl.d/99-tvguard.conf`). This is a hard requirement, not hygiene.
 * **rp_filter**: strict mode would be satisfied here (route back to the TV is
   via the same interface the packet arrived on); no change was required.
@@ -98,7 +98,7 @@ deleted/reloaded; the apply script never flushes anything else).
 For a TV whose gateway is `.128`, plain DNS to `.128:53` works normally.
 Attempts to bypass (TV → 8.8.8.8:53, 1.1.1.1:53, vendor resolvers, any
 UDP/TCP 53 to a non-local IP) are **transparently redirected** by
-`prerouting: ip saddr @tvs ip daddr != 192.168.0.128 {udp|tcp} dport 53
+`prerouting: ip saddr @tvs ip daddr != <TVGUARD_IP> {udp|tcp} dport 53
 dnat to 172.18.0.2:53`.
 
 * **DNAT, not `redirect`**: an explicit DNAT to the Pi-hole container IP is
@@ -126,7 +126,7 @@ dnat to 172.18.0.2:53`.
 | `table ip tvguard` (sets + 3 chains) | `tvguard-apply.sh` renders, `nft -c` validates, deletes+loads ONLY this table | `tvguard-disable.sh` |
 | 2× `ufw-user-forward` ACCEPT rules | `ufw route allow from <tv> to any` (ufw API, not hand-edited iptables) | `ufw route delete ...` per TV in `tvguard-disable.sh` |
 | `net.ipv4.ip_forward=1` | sysctl + `/etc/sysctl.d/99-tvguard.conf` | baseline-captured, restored on disable |
-| `net.ipv4.conf.enp2s0.send_redirects=0` | same | same |
+| `net.ipv4.conf.<LAN_INTERFACE>.send_redirects=0` | same | same |
 | `tvguard.service` (oneshot, after network+docker, gated by `active` marker) | installed via `deploy/tvguard.service.in` | `tvguard-disable.sh` stops+disables |
 
 Untouched (verified by diff against `05-baseline-netfilter.txt`): all UFW
@@ -137,8 +137,8 @@ table, `ip6` tables, Plex/Samba/Transmission/SSH/invoice containers, Hub.
 
 Facts established by direct measurement (not assumption):
 
-* kiaserver `enp2s0`: **link-local only** (`fe80::c23c:1804:6d08:d906`), no
-  global unicast address, no IPv6 default route, `net.ipv6.conf.enp2s0.forwarding=0`.
+* this box `<LAN_INTERFACE>`: **link-local only** (`fe80::c23c:1804:6d08:d906`), no
+  global unicast address, no IPv6 default route, `net.ipv6.conf.<LAN_INTERFACE>.forwarding=0`.
 * Passive capture of **all Router Advertisements on the segment: 60 s and then
   4 continuous minutes — zero RAs observed** (`reports/raw/ra-capture-4min.txt`).
   A 4-minute window is ~12× the typical 200 s RA interval, so the conclusion
@@ -149,7 +149,7 @@ Facts established by direct measurement (not assumption):
 
 Conclusion: **the TVs have no IPv6 path to the Internet today** — a TV can at
 most talk link-local to other LAN neighbours, which is not exfiltration.
-No IPv6 disruption was applied (nothing to disrupt). If Virgin ever enables
+No IPv6 disruption was applied (nothing to disrupt). If the ISP ever enables
 IPv6 (RAs with a global prefix), the same TVGuard pattern must be mirrored in
 the `ip6` table for the two TV MACs/addresses before that becomes a bypass —
 documented, not implemented, because there is currently nothing to block.
@@ -201,7 +201,7 @@ production logic. Result: **7/7 PASS** —
 4. Pi-hole logged the query with client = the mock TV IP (attribution works)
 5. plain HTTP egress 200 via masquerade
 6. HTTPS egress 301 via masquerade
-7. conntrack shows the NATed return path through 192.168.0.128
+7. conntrack shows the NATed return path through <TVGUARD_IP>
 
 Teardown removed the mock table, mock ufw rule and netns; production state
 verified unchanged afterwards. The two selftest session recordings
@@ -230,8 +230,8 @@ comparator separates observed / inference / classification explicitly.
 
 ## 11. PoC limitations (stated honestly)
 
-* **No LAN isolation**: all devices stay in 192.168.0.0/24. `TV → another
-  192.168.0.x` traffic stays layer-2 direct and does NOT traverse us (and
+* **No LAN isolation**: all devices stay in <LAN_SUBNET>. `TV → another
+  <LAN_PREFIX>.x` traffic stays layer-2 direct and does NOT traverse us (and
   cannot be seen by us). This PoC controls TV→Internet egress only.
 * **No TLS inspection**: we see destination IPs, ports, bytes, timing and DNS
   names — never the encrypted payload. "What did the TV say to its voice

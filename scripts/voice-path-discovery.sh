@@ -22,25 +22,25 @@ A0="${3:-60}"
 A1="${4:-240}"
 resolve_vendor_tv() {
 python3 - "$ROOT" "$1" <<'PY'
-import sys, yaml
+import sys, os, yaml
+sys.path.insert(0, sys.argv[1] + "/scripts")
+from tvguard_target_config import load_target_config
 root, v = sys.argv[1], sys.argv[2]
-try:
-    inst = yaml.safe_load(open(root + "/config/privacy-instances.yaml"))["instances"][v]
-    doc = yaml.safe_load(open(root + "/" + inst["policy"]))
-except (FileNotFoundError, KeyError):
-    doc = yaml.safe_load(open(root + "/config/privacy-policy.yaml"))
-print((doc.get("applies_to") or ["192.168.0.197"])[0])
+inst = yaml.safe_load(open(root + "/config/privacy-instances.yaml"))["instances"]
+tc = load_target_config(inst)
+targets = tc.vendor_targets.get(v) or []
+print(targets[0] if targets else "")
 PY
 }
 
 # 5th arg: explicit TV IP, or a vendor name (samsung|lg) resolved via the
-# registry (first applies_to entry of that vendor's policy). Empty = samsung.
+# registry + machine config (first target of that vendor). Empty = samsung.
 TV="${5:-}"
 case "$TV" in
   samsung|lg) TV=$(resolve_vendor_tv "$TV") ;;
   "") TV=$(resolve_vendor_tv samsung) ;;
 esac
-[ -n "$TV" ] || { echo "could not resolve the TV address" >&2; exit 5; }
+[ -n "$TV" ] || { echo "could not resolve the TV address (machine config has no target for this vendor)" >&2; exit 5; }
 
 OUT="$ROOT/captures/voice-discovery/${LABEL}-$(date -u +%Y%m%d-%H%M%S)"
 mkdir -p "$OUT"

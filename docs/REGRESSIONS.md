@@ -25,7 +25,7 @@ failure cannot silently return. Each entry has a re-verification command.
 |---|---|
 | Date | 2026-09-21 11:57:53 UTC |
 | Test | Policy coverage check (server-side) |
-| Expected | every Bixby voice host denied for 192.168.0.197 |
+| Expected | every Bixby voice host denied for <SAMSUNG_TV_IP> |
 | Actual | `prdcore1-euw1-user.aibixby.com` FORWARDED (real IPs) and TV connected to all 3 ELB IPs; `bixby-developer-assets.aibixby.com` FORWARDED 8 s later |
 | Result | **FAIL** |
 | Fix | same as R-001 (suffix policy); live set now contains 54.73.238.66 / 54.194.216.100 / 63.33.161.193 (verified present in `tv_privacy_blocked`) |
@@ -37,4 +37,4 @@ failure cannot silently return. Each entry has a re-verification command.
 |---|---|
 | Finding | deny rules match `ct state new` only; established voice connections and TV-side cached DNS answers survive an (re-)apply |
 | Mitigation | `scripts/privacy-reset-tv-voice-state.sh` after every apply that adds voice denies (per-TV, per-IP, never global) |
-| Re-verify | after apply: `sudo conntrack -L \| grep 192.168.0.197 \| grep -E '54.73.238.66\|54.194.216.100\|63.33.161.193'` → empty |
+| Re-verify | after apply: `sudo conntrack -L \| grep <SAMSUNG_TV_IP> \| grep -E '54.73.238.66\|54.194.216.100\|63.33.161.193'` → empty |

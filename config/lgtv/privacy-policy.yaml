@@ -45,12 +45,6 @@
 # only reliable way to catch the rotating names; see research/lg/safenetiot-lg.md).
 # Domains in config/lgtv/privacy-keep.yaml override everything (keep wins).
 
-applies_to:
-  [] # EMPTY until the LG is discovered on the network. The engine treats an
-     # empty list as "vendor inactive": the build resolves the policy, but
-     # applying errors with a clear message and no firewall/Pi-hole objects
-     # are created for this vendor. After discovery (scripts/discover-lan.sh),
-     # add the LG's IP here AND to TVS in config/tvguard.conf.
 
 updated: "2026-09-22"
 version: 1

@@ -51,10 +51,12 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/_tvguard_env.sh" || exit 4
 RES="$ROOT/data/privacy-policy/resolved.json"
 NS=tgpt; VETH_HG=veth-pt-hg; VETH_TV=veth-pt-tv
 NSIP=10.99.99.2; HOSTIP=10.99.99.1
-LAN=192.168.0.0/24
+MOCK_LAN=10.99.99.0/24   # the throwaway mock network (never the real LAN)
 PASS=0; FAIL=0
 run_ns(){ ip netns exec "$NS" "$@"; }
 ok(){ echo "  PASS: $1"; PASS=$((PASS+1)); }
@@ -301,7 +303,8 @@ while IFS= read -r line; do
 done <<< "$T0_OUT"
 
 render_vendor_profile(){ # vendor prof -> prints nft to stdout
-  VENDOR="$1" PROF="$2" PRIVACY_RES="$RES" RESIP="$CIP" NSIP="$NSIP" python3 - <<'PYEOF'
+  VENDOR="$1" PROF="$2" PRIVACY_RES="$RES" RESIP="$CIP" NSIP="$NSIP" \
+  BOXIP="$HOSTIP" MOCK_LAN="$MOCK_LAN" EGRESS_IF="$LAN_INTERFACE" python3 - <<'PYEOF'
 import json, os
 d = json.load(open(os.environ["PRIVACY_RES"]))
 v = os.environ["VENDOR"]; prof = os.environ["PROF"]
@@ -309,6 +312,7 @@ vs = d["vendors"][v]
 def fmt(ips):
     return ", ".join(ips) if ips else ""
 sec = vs[prof]
+box = os.environ["BOXIP"]; mlan = os.environ["MOCK_LAN"]; egress = os.environ["EGRESS_IF"]
 print("table ip tvguard-ptest {")
 print("    set tvs { type ipv4_addr ; elements = { %s } ; }" % os.environ["NSIP"])
 print("    set tv_privacy_blocked_%s { type ipv4_addr ; flags interval ; elements = { %s } ; }" % (v, fmt(sec["ips"])))
@@ -316,26 +320,26 @@ if prof == "strict" and vs["doh"]["ips"]:
     print("    set tv_doh_blocked_%s { type ipv4_addr ; flags interval ; elements = { %s } ; }" % (v, fmt(vs["doh"]["ips"])))
 print("    chain forward {")
 print("        type filter hook forward priority -150 ;")
-print("        ip saddr @tvs ip daddr 192.168.0.0/24 counter accept")
+print("        ip saddr @tvs ip daddr %s counter accept" % mlan)
 if sec["ips"]:
     print("        ip saddr @tvs ip daddr @tv_privacy_blocked_%s ct state new counter log prefix \"TVGUARD-PT-PRIV-%s \" drop" % (v, v.upper()))
 if prof == "strict" and vs["doh"]["ips"]:
     print("        ip saddr @tvs ip daddr @tv_doh_blocked_%s ct state new counter log prefix \"TVGUARD-PT-DOH-%s \" drop" % (v, v.upper()))
 print("        ip saddr @tvs tcp dport 853 ct state new counter log prefix \"TVGUARD-PT-DOT-%s \" drop" % v.upper())
 print("        ip saddr @tvs udp dport 853 ct state new counter log prefix \"TVGUARD-PT-DOT-%s \" drop" % v.upper())
-print("        ip saddr @tvs ip daddr != 192.168.0.0/24 ct state new counter log prefix \"TVGUARD-PT-NEW \" accept")
-print("        ip saddr @tvs ip daddr != 192.168.0.0/24 counter accept")
+print("        ip saddr @tvs ip daddr != %s ct state new counter log prefix \"TVGUARD-PT-NEW \" accept" % mlan)
+print("        ip saddr @tvs ip daddr != %s counter accept" % mlan)
 print("        ip daddr @tvs ct state established,related counter accept")
 print("        counter continue")
 print("    }")
 print("    chain prerouting {")
 print("        type nat hook prerouting priority -150 ;")
-print("        ip saddr @tvs ip daddr != 192.168.0.128 udp dport 53 dnat to %s:53" % os.environ["RESIP"])
-print("        ip saddr @tvs ip daddr != 192.168.0.128 tcp dport 53 dnat to %s:53" % os.environ["RESIP"])
+print("        ip saddr @tvs ip daddr != %s udp dport 53 dnat to %s:53" % (box, os.environ["RESIP"]))
+print("        ip saddr @tvs ip daddr != %s tcp dport 53 dnat to %s:53" % (box, os.environ["RESIP"]))
 print("    }")
 print("    chain postrouting {")
 print("        type nat hook postrouting priority srcnat ;")
-print("        ip saddr @tvs ip daddr != 192.168.0.0/24 oifname \"enp2s0\" counter masquerade")
+print("        ip saddr @tvs ip daddr != %s oifname \"%s\" counter masquerade" % (mlan, egress))
 print("    }")
 print("}")
 PYEOF

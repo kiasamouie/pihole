@@ -28,16 +28,21 @@ need_root() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"
 
-[ -f "$ROOT/config/tvguard.conf" ] || {
-  echo "ERROR: $ROOT/config/tvguard.conf not found (copy from .example)" >&2; exit 4
-}
+# Machine config (TVGUARD_ENV > $ROOT/.env > legacy config/tvguard.conf).
 # shellcheck source=/dev/null
-. "$ROOT/config/tvguard.conf"
+. "$SCRIPT_DIR/_tvguard_env.sh" || exit 4
 
 : "${LAN_INTERFACE:=}" "${LAN_SUBNET:=}" "${GATEWAY_IP:=}" "${UPSTREAM_ROUTER:=}"
 : "${TVS:=}" "${MODE:=}" "${STATE_DIR:=/var/lib/tvguard}" "${WAN_INTERFACE:=}"
-[ -n "$LAN_INTERFACE" ] && [ -n "$LAN_SUBNET" ] && [ -n "${TVS:-}" ] || {
-  echo "ERROR: LAN_INTERFACE, LAN_SUBNET and TVS must be set in config" >&2; exit 4
+missing=""
+for name in MODE LAN_INTERFACE LAN_SUBNET GATEWAY_IP PIHOLE_IP UPSTREAM_ROUTER TVS; do
+  [ -n "${!name:-}" ] || missing="$missing${missing:+, }$name"
+done
+if [ "$MODE" = "dualnic-gateway" ] && [ -z "$WAN_INTERFACE" ]; then
+  missing="$missing${missing:+, }WAN_INTERFACE"
+fi
+[ -z "$missing" ] || {
+  echo "ERROR: required values missing from $TVGUARD_ENV: $missing" >&2; exit 4
 }
 
 # Testability override: TGUARD_TVS replaces the TV list in the rendered table

@@ -1,7 +1,7 @@
 # 09 — Voice-Path Investigation (the Tokyo-weather regression)
 
 Date: 2026-09-21 (UTC)
-Samsung: QE65Q75CATXXU, 192.168.0.197, gw/DNS 192.168.0.128
+Samsung: Samsung Tizen TV, <SAMSUNG_TV_IP>, gw/DNS <TVGUARD_IP>
 Policy at time of test: `standard-no-voice` v1 (37 exact domains, 2 Bixby hosts)
 
 ---
@@ -107,7 +107,7 @@ Justification against the project's own suffix rule (all four conditions met):
    hosts on voice use (11:57:53 evidence above).
 4. **Structurally safe** — selftest proves: no rule touches TCP/443 or
    UDP/443; the IP set excludes any IP shared with keep-list infrastructure
-   (keep wins); the policy still applies only to 192.168.0.197.
+   (keep wins); the policy still applies only to <SAMSUNG_TV_IP>.
 
 Two enforcement layers, by design:
 

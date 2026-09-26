@@ -1,8 +1,8 @@
 # Samsung TV Manual Test Checklist (after enabling a privacy profile)
 
-For: Samsung QE65Q75CATXXU at `192.168.0.197` (gateway + DNS = `192.168.0.128`).
+For: Samsung Q-series QLED TV at `<SAMSUNG_TV_IP>` (gateway + DNS = `<TVGUARD_IP>`).
 
-**Current profile: `manufacturer-lockdown` (live since 2026-09-22).** The
+**Active profile: `manufacturer-lockdown`.** The
 expected results below apply to it: everything except **cloud voice** must
 work; cloud Bixby/fresh voice search is intentionally broken. Under mlock, any
 Samsung hostname that is not on the documented keep list (SAMSUNG_ALLOWED_EGRESS.md)
@@ -15,13 +15,13 @@ Run these tests in order **after** you have enabled a profile and
 these are the physical steps. For each test: what you do, what counts as PASS,
 what counts as FAIL, and the server command to diagnose a failure.
 
-Useful server diagnostics (run from kiaserver):
+Useful server diagnostics (run from the TVGuard box):
 
 ```bash
-python3 scripts/show-dns-activity.py 192.168.0.197     # recent DNS queries from the TV (with results)
+python3 scripts/show-dns-activity.py <SAMSUNG_TV_IP>   # recent DNS queries from the TV (with results)
 sudo scripts/privacy-policy-status.sh                  # current policy state + Pi-hole group
 sudo dmesg | grep -E 'TVGUARD-(PRIVACY|DOT|DOH)' | tail -30   # firewall block events (dest IP shown)
-sudo conntrack -L | grep 192.168.0.197 | head           # live NATed connections through the server
+sudo conntrack -L | grep <SAMSUNG_TV_IP> | head         # live NATed connections through the server
 sudo scripts/tvguard-status.sh                         # TVGuard mode + counters + NAT health
 ```
 
@@ -51,7 +51,7 @@ sudo scripts/tvguard-status.sh                         # TVGuard mode + counters
 - **Do:** open YouTube, play a video, seek forward/back once, close.
 - **PASS:** playback starts within ~5 s, seeking works, video completes.
 - **FAIL:** buffering loop, immediate stop, or "can't play video".
-- **Diagnose:** `conntrack -L | grep 192.168.0.197` should show UDP/443 (QUIC)
+- **Diagnose:** `conntrack -L | grep <SAMSUNG_TV_IP>` should show UDP/443 (QUIC)
   and/or TCP/443 flows to Google video IPs; `dmesg | grep TVGUARD-PRIVACY` must
   NOT show a googlevideo/YouTube IP being dropped.
 
@@ -81,7 +81,7 @@ sudo scripts/tvguard-status.sh                         # TVGuard mode + counters
 - **PASS:** streams. Note: `nrdp.logs.netflix.com` (telemetry) is blocked by
   the policy — playback is not supposed to need it.
 - **FAIL:** streams fail or quality is stuck low.
-- **Diagnose:** `conntrack -L | grep 192.168.0.197` for Netflix CDN flows;
+- **Diagnose:** `conntrack -L | grep <SAMSUNG_TV_IP>` for Netflix CDN flows;
   `dmesg | grep TVGUARD-PRIVACY` to confirm only the telemetry host is hit.
 
 ## 7. Casting from a phone
@@ -160,7 +160,7 @@ Run the scientific version (one command + the three questions below):
 1. `sudo scripts/privacy-policy-disable.sh` (one command — privacy layer off,
    gateway/monitoring stay, TV internet returns immediately).
 2. If it works again, the failing domain is visible in
-   `python3 scripts/show-dns-activity.py 192.168.0.197` (blocked entries) —
+   `python3 scripts/show-dns-activity.py <SAMSUNG_TV_IP>` (blocked entries) —
    report it; if the keep decision is right it goes into
    `config/privacy-keep.yaml` and the policy is re-applied.
 3. Re-apply the active profile:

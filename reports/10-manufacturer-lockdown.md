@@ -1,6 +1,6 @@
 # Report 10 — Manufacturer Lockdown (Samsung deny-by-default)
 
-Date: 2026-09-22 · State: **ACTIVE on 192.168.0.197** (applied 10:54Z)
+Date: 2026-09-22 · State: **ACTIVE on <SAMSUNG_TV_IP>** (applied 10:54Z)
 
 ## 1. What changed vs. `standard-no-voice`
 
@@ -50,13 +50,13 @@ DoH-IP set.
 
 | Layer | What | Scope |
 |-------|------|-------|
-| nftables `table ip tvguard` | `tv_privacy_blocked` (166 resolved deny IPs) + drop rule; DoT 853 drop; external :53 DNAT to Pi-hole — all matching the **`tv_privacy` set = `applies_to` = {192.168.0.197} only** | Samsung only (Google TV .90 unaffected — verified 2026-09-22) |
-| Pi-hole group `TVGuard-Privacy` (id 13) | 37 exact denies + 14 regex denies (aibixby + 13 zones) + 19 allow rows (keep wins; FTL allow beats deny) | client 192.168.0.197 only |
+| nftables `table ip tvguard` | `tv_privacy_blocked` (166 resolved deny IPs) + drop rule; DoT 853 drop; external :53 DNAT to Pi-hole — all matching the **`tv_privacy` set = `applies_to` = {<SAMSUNG_TV_IP>} only** | Samsung only (Google TV .90 unaffected — verified 2026-09-22) |
+| Pi-hole group `TVGuard-Privacy` (id 13) | 37 exact denies + 14 regex denies (aibixby + 13 zones) + 19 allow rows (keep wins; FTL allow beats deny) | client <SAMSUNG_TV_IP> only |
 | keep-list | `config/manufacturer-keep.yaml` (19 documented hosts) + `config/privacy-keep.yaml` (global) | overrides all denies |
 | logging | denied zone queries logged by Pi-hole; unknown Samsung hosts tracked in `data/manufacturer-unknown/` (git-ignored) | review via show-unknown-samsung.sh / manufacturer-review.sh |
 
 **Scope fix (2026-09-22):** before today the firewall privacy rules matched the
-full `tvs` set, which also contains the Google TV `192.168.0.90` — i.e. the
+full `tvs` set, which also contains the Google TV `<GOOGLE_TV_IP>` — i.e. the
 Samsung policy was silently being applied to the Google TV. The engine now
 renders a dedicated `tv_privacy` set from `applies_to` and all privacy/DoT/
 DNS-forcing rules match it. The TVGuard core rules (TV→LAN, monitor log,
@@ -103,7 +103,7 @@ the Samsung zones was either a documented keep or an already-classified deny.
 | DoH over 443 | **PARTIALLY CONTROLLED** (known dedicated DoH frontends are in the 166-IP deny set when they resolve to non-shared IPs; DoH multiplexed on shared CDN/443 cannot be distinguished at the network layer — no blanket 443 rule, by design) |
 | Direct IP (dedicated Samsung infra) | **CONTROLLED** (deny set is IP-based) |
 | Direct IP (shared AWS/CloudFront) | **NOT CONTROLLED (accepted)** — blocking shared IPs would break Prime/Netflix/YouTube; hostname-level control only |
-| IPv6 | **NOT CURRENTLY APPLICABLE** (re-verified 2026-09-22: enp2s0 link-local only, accept_ra=0, no global route) |
+| IPv6 | **NOT CURRENTLY APPLICABLE** (re-verified 2026-09-22: <LAN_INTERFACE> link-local only, accept_ra=0, no global route) |
 | QUIC/UDP-443 | **INTENTIONALLY ALLOWED** (no rule touches it) |
 | Shared-CDN telemetry | **PARTIALLY CONTROLLED** (exact-domain DNS denies only; IP collides with keep infra) |
 | Offline-buffered uploads | **DETECTABLE, NOT PROVABLE** — tv-offline-reconnect-test.sh can prove "X bytes to Y after reconnect"; it cannot prove content |

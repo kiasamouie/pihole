@@ -46,12 +46,26 @@ def run(cmd, timeout=6):
 
 
 def default_iface():
+    # 1. machine config (LAN_INTERFACE)  2. interface of the default route
+    try:
+        import os, sys
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from tvguard_target_config import load_target_config
+        import yaml
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, "..", "config", "privacy-instances.yaml"), encoding="utf-8") as fh:
+            inst = (yaml.safe_load(fh) or {}).get("instances") or {}
+        val = load_target_config(inst).values.get("LAN_INTERFACE", "").strip()
+        if val:
+            return val
+    except Exception:
+        pass
     out = run(["ip", "-4", "route", "show", "default"])
     for line in out.splitlines():
         parts = line.split()
         if "dev" in parts:
             return parts[parts.index("dev") + 1]
-    return "enp2s0"
+    raise SystemExit("could not determine LAN interface (set LAN_INTERFACE in the machine config)")
 
 
 def default_pihole_base():

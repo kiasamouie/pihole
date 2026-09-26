@@ -12,7 +12,7 @@ reports/raw/*.pcap
 # TVGuard session captures (runtime data, can be large)
 captures/
 
-# Machine-specific TVGuard config (committed template: config/tvguard.conf.example)
+# Legacy machine-config path (machine config now lives in .env; kept ignored for old checkouts)
 config/tvguard.conf
 
 # Local scratch

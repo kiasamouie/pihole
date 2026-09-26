@@ -1,7 +1,6 @@
-# FINAL BLOCKING PLAN — Samsung QE65Q75CATXXU (192.168.0.197)
+# FINAL BLOCKING PLAN — Samsung Q-series QLED TV (<SAMSUNG_TV_IP>)
 
-**State: ACTIVE — `manufacturer-lockdown`** (applied 2026-09-22 10:54Z,
-Samsung .197 only). All profiles below are researched, generated,
+**State: ACTIVE — `manufacturer-lockdown`** (Samsung .197 only). All profiles below are researched, generated,
 syntax-tested (netns + throwaway table), Pi-hole-API-tested (temporary group,
 fully cleaned), and rollback-tested.
 
@@ -9,7 +8,7 @@ fully cleaned), and rollback-tested.
 sudo scripts/privacy-policy-apply.sh standard              # ACR + ads + high-conf telemetry + DoT
 sudo scripts/privacy-policy-apply.sh standard-no-voice     # + confirmed Bixby/voice cloud
 sudo scripts/privacy-policy-apply.sh strict                # + low-conf telemetry + DoH-IP set
-sudo scripts/privacy-policy-apply.sh manufacturer-lockdown # + Samsung deny-by-default (RECOMMENDED; LIVE)
+sudo scripts/privacy-policy-apply.sh manufacturer-lockdown # + Samsung deny-by-default (RECOMMENDED; ACTIVE)
 sudo scripts/privacy-policy-disable.sh                     # full privacy rollback (one command)
 sudo scripts/privacy-live-check.sh                         # post-enable verification
 sudo scripts/privacy-watch.sh 30 --auto-rollback           # 30-min safety watch
@@ -29,7 +28,7 @@ standard              = tiers include "standard"
 standard-no-voice     = tiers include "standard" OR "voice"   (= standard + voice)
 strict                = ALL entries (superset) + DoH endpoint IP set
 manufacturer-lockdown = standard-no-voice + 13 deny-by-default Samsung zone regexes
-                        + 19 documented keep rows (keep wins)   [RECOMMENDED, LIVE]
+                        + 19 documented keep rows (keep wins)   [RECOMMENDED, ACTIVE]
 ```
 
 `manufacturer-lockdown` is defined in `config/manufacturer.yaml` (zones) +
@@ -188,7 +187,7 @@ STANDARD-NO-VOICE WILL INTENTIONALLY BREAK:
   **DNAT to Pi-hole** (transparent redirect to our resolver; attribution kept
   via the explicit container-IP DNAT). The TV keeps working; Pi-hole keeps control.
 - TV → TCP/UDP 853 (DoT): **DROP + log** (`TVGUARD-DOT`).
-- TV → anything: MASQUERADE out, replies return via kiaserver (proven live).
+- TV → anything: MASQUERADE out, replies return via the TVGuard box (proven live).
 
 ## 4. STANDARD WILL LEAVE WORKING
 
@@ -200,7 +199,7 @@ updates, Prime Video, app store, normal HTTPS (TCP 443 untouched).
 No rule touches: TCP/443 (blanket), UDP/443 (QUIC stays free), LAN traffic
 (Plex/casting/discovery), other devices (policy scoped to .197 only).
 
-## 4b. MANUFACTURER-LOCKDOWN (the recommended, LIVE profile)
+## 4b. MANUFACTURER-LOCKDOWN (the recommended, ACTIVE profile)
 
 Semantics: non-Samsung internet services work normally; **Samsung/manufacturer
 egress is deny-by-default unless explicitly classified as essential.**
@@ -238,9 +237,9 @@ MANUFACTURER-LOCKDOWN WILL NOT BLOCK:
 - the strict-only low-confidence telemetry (nmetrics/smetrics/…) and the
   DoH-IP enforcement set (not inherited).
 
-Live state (2026-09-22): group TVGuard-Privacy = 70 rows (37 exact + 14
-regex + 19 allow), client 192.168.0.197 only; `tv_privacy_blocked` = 166 IPs;
-`tv_privacy` scope set = {192.168.0.197}; UFW/Docker/NAT untouched.
+Deployed state: group TVGuard-Privacy = 70 rows (37 exact + 14
+regex + 19 allow), client <SAMSUNG_TV_IP> only; `tv_privacy_blocked` = 166 IPs;
+`tv_privacy` scope set = {<SAMSUNG_TV_IP>}; UFW/Docker/NAT untouched.
 Rollback: `sudo scripts/privacy-policy-disable.sh` (removes all 70 rows
 including the allows, the deny sets and the DoT rules; keeps the gateway).
 
@@ -306,10 +305,10 @@ per-domain review after more observation.
 | DoT (TCP/UDP 853) | **CONTROLLED when policy active** | explicit drop + log (`TVGUARD-DOT`); also enforced by TVGuard `enforce` mode |
 | DoH (known resolver endpoints) | **PARTIALLY CONTROLLED** (strict) | curated IP set of 15; cannot distinguish DoH from HTTPS when the same IP fronts both |
 | QUIC / UDP-443 | **INTENTIONALLY ALLOWED** | no rule exists touching UDP/443 (verified in rendered table) - YouTube/streaming depend on it |
-| IPv6 | **NOT CURRENTLY APPLICABLE** | re-verified 2026-09-21: enp2s0 link-local only, no RA (accept_ra=0), no v6 default route, v6 forwarding off → no IPv6 Internet path exists to bypass through |
+| IPv6 | **NOT CURRENTLY APPLICABLE** | re-verified at deployment: <LAN_INTERFACE> link-local only, no RA (accept_ra=0), no v6 default route, v6 forwarding off → no IPv6 Internet path exists to bypass through |
 | Direct-IP connections (no DNS) | **CONTROLLED for listed IPs only** | the deny set is IP-based, so a TV connecting by raw IP to a listed deny IP is still dropped; unlisted raw-IP destinations are not (DNS can't see them either) |
 | Shared CDN IPs / cached DNS | **PARTIALLY CONTROLLED** | keep-list IP collision check protects essential shared infra in the other direction; cached DNS means a blocked domain still works from cache until TTL expiry |
-| Local LAN access (TV → other 192.168.0.x) | **NOT CONTROLLED (accepted)** | flat L2 PoC; this policy is about TV→Internet egress. LAN isolation requires the later VLAN/dedicated-hardware phase |
+| Local LAN access (TV → other <LAN_SUBNET> hosts) | **NOT CONTROLLED (accepted)** | flat L2 PoC; this policy is about TV→Internet egress. LAN isolation requires the later VLAN/dedicated-hardware phase |
 
 ## 9. Physical TV tests to run AFTER enabling (server cannot click the TV)
 

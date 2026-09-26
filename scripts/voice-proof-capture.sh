@@ -29,15 +29,16 @@ if [ "$(id -u)" -ne 0 ]; then echo "run with sudo" >&2; exit 3; fi
 LABEL="${1:-voice-proof}"
 VENDOR="${2:-samsung}"
 TV=$(VENDOR="$VENDOR" ROOT="$ROOT" python3 -c '
-import os, yaml
+import os, sys, yaml
+sys.path.insert(0, os.environ["ROOT"] + "/scripts")
+from tvguard_target_config import load_target_config
 root = os.environ["ROOT"]; v = os.environ["VENDOR"]
-try:
-    inst = yaml.safe_load(open(root + "/config/privacy-instances.yaml"))["instances"][v]
-    doc = yaml.safe_load(open(root + "/" + inst["policy"]))
-except (FileNotFoundError, KeyError):
-    doc = yaml.safe_load(open(root + "/config/privacy-policy.yaml"))
-print((doc.get("applies_to") or ["192.168.0.197"])[0])
+inst = yaml.safe_load(open(root + "/config/privacy-instances.yaml"))["instances"]
+tc = load_target_config(inst)
+targets = tc.vendor_targets.get(v) or []
+print(targets[0] if targets else "")
 ')
+[ -n "$TV" ] || { echo "no TV target configured for vendor $VENDOR in the machine config" >&2; exit 5; }
 
 echo "====================================================================="
 echo " VOICE-PROOF CAPTURE  (tv=$TV, vendor=$VENDOR, label=$LABEL)"

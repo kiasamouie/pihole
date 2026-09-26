@@ -2,7 +2,7 @@
 # capture-device.sh - Passive per-device packet capture on the LAN interface.
 #
 # Usage: sudo scripts/capture-device.sh <IP> [seconds] [output.pcap]
-#   e.g. sudo scripts/capture-device.sh 192.168.0.197 300 data/cap-tv197.pcap
+#   e.g. sudo scripts/capture-device.sh <TV_IP> 300 data/cap-tv.pcap
 #
 # Captures all traffic to/from one IP. snaplen 192 bytes: enough for DNS
 # question/answer, TLS SNI, QUIC connection-id, TCP/UDP 5-tuple - not full
@@ -14,11 +14,15 @@
 # TV->Internet unicast will NOT appear until the TV uses this server for DNS
 # (then DNS is visible) or this box becomes the gateway (then everything is).
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/_tvguard_env.sh" 2>/dev/null || true
 
 IP="${1:?usage: capture-device.sh <IP> [seconds] [output.pcap]}"
 SECS="${2:-60}"
 OUT="${3:-data/cap-$IP-$SECS.pcap}"
-IFACE="${IFACE:-enp2s0}"
+IFACE="${IFACE:-${LAN_INTERFACE:-}}"
+[ -n "$IFACE" ] || { echo "IFACE not set (no LAN_INTERFACE in machine config)" >&2; exit 4; }
 
 mkdir -p "$(dirname "$OUT")"
 chmod 600 "$OUT" 2>/dev/null || true

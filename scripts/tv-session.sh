@@ -29,17 +29,20 @@ if [ "$(id -u)" -ne 0 ]; then echo "run with sudo"; exit 3; fi
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$DIR")"
-[ -f "$ROOT/config/tvguard.conf" ] || { echo "config/tvguard.conf missing" >&2; exit 4; }
 # shellcheck source=/dev/null
-. "$ROOT/config/tvguard.conf"
+. "$DIR/_tvguard_env.sh" || exit 4
 
 [ $# -eq 3 ] || { echo "usage: tv-session.sh <tv|ip> <label> <duration>" >&2; exit 2; }
 TV_NAME="$1"; LABEL="$2"; DUR="$3"
 
 # --- resolve TV name -> IP ----------------------------------------------------
+# First address of the vendor list from the machine config (legacy single-IP
+# keys honoured as fallback).
+first_of(){ echo "$1" | awk 'NR==1'; }
 case "$TV_NAME" in
-  samsung)  TV_IP="$SAMSUNG_IP" ;;
-  google)   TV_IP="$GOOGLE_TV_IP" ;;
+  samsung)  TV_IP=$(first_of "${SAMSUNG_TVS:-${SAMSUNG_IP:-}}") ;;
+  lg)       TV_IP=$(first_of "${LG_TVS:-${LG_IP:-}}") ;;
+  google)   TV_IP=$(first_of "${GOOGLE_TVS:-${GOOGLE_TV_IP:-}}") ;;
   *)        TV_IP="$TV_NAME" ;;
 esac
 [[ "$TV_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { echo "unknown tv: $TV_NAME" >&2; exit 2; }
@@ -101,7 +104,7 @@ nft_counters > "$OUT/nft-counters-end.txt"
 echo "  window: $T_START -> $T_END (UTC epoch)"
 
 # --- DNS via Pi-hole API --------------------------------------------------------
-PH_IP="${PIHOLE_IP:-192.168.0.128}"
+PH_IP="${PIHOLE_IP:-$GATEWAY_IP}"
 PH_PORT=3001
 if [ -f "$ROOT/.env" ]; then
   PW=$(grep '^ADMIN_PASSWORD=' "$ROOT/.env" | cut -d= -f2)

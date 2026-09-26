@@ -1,48 +1,65 @@
 #!/usr/bin/env bash
 #
-# tvguard-disable.sh  -  ONE-COMMAND emergency rollback.
+# tvguard-disable.sh - ONE-COMMAND emergency rollback.
 #
 #   sudo scripts/tvguard-disable.sh
 #
-# This removes ONLY the TVGuard footprint:
-#   * deletes the nftables table `ip tvguard` (and nothing else)
-#   * removes the per-TV `ufw route` rules we added (ufw-user-forward ONLY;
-#     no other UFW rule, chain, Docker rule, or UFW state is touched)
-#   * restores the sysctls we changed (from the captured baseline)
-#   * removes our /etc/sysctl.d/99-tvguard.conf
-#   * stops + disables the tvguard.service unit (if present)
-# It does NOT flush anything, does NOT touch Pi-hole, Plex, Samba, or any
-# other service. After this, reverting a TV to
-# gateway=upstream / DNS=automatic restores its original network path.
+# Removes only TVGuard's nftables table, configured per-TV UFW route rules,
+# captured sysctl changes/files, service state, and runtime markers. It never
+# flushes nftables, conntrack, UFW, or any unrelated service.
 #
-# Deliberately uses `set -u` (not `-e`): a rollback must never abort early.
+# Deliberately uses `set -u` (not `-e`): a rollback must not abort midway.
 set -uo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$DIR")"
+STATE_DIR=/var/lib/tvguard
 
-LAN_INTERFACE="enp2s0"; STATE_DIR="/var/lib/tvguard"
-if [ -f "$ROOT/config/tvguard.conf" ]; then
-  # shellcheck source=/dev/null
-  . "$ROOT/config/tvguard.conf"
+if [ "$(id -u)" -ne 0 ]; then echo "ERROR: run with sudo" >&2; exit 3; fi
+# Machine config (TVGUARD_ENV > $ROOT/.env > legacy config/tvguard.conf).
+# shellcheck source=/dev/null
+. "$DIR/_tvguard_env.sh" || exit 4
+
+missing=""
+for name in MODE LAN_INTERFACE LAN_SUBNET GATEWAY_IP UPSTREAM_ROUTER TVS; do
+  [ -n "${!name:-}" ] || missing="$missing${missing:+, }$name"
+done
+if [ "$MODE" = "dualnic-gateway" ] && [ -z "${WAN_INTERFACE:-}" ]; then
+  missing="$missing${missing:+, }WAN_INTERFACE"
 fi
-LAN_INTERFACE="${LAN_INTERFACE:-enp2s0}"
-STATE_DIR="${STATE_DIR:-/var/lib/tvguard}"
+[ -z "$missing" ] || { echo "ERROR: required values missing from $TVGUARD_ENV: $missing" >&2; exit 4; }
+case "$MODE" in
+  onearm-poc|dualnic-gateway) : ;;
+  *) echo "ERROR: invalid MODE in $TVGUARD_ENV: $MODE" >&2; exit 4 ;;
+esac
+if ! CONFIG_LAN="$LAN_SUBNET" CONFIG_GW="$GATEWAY_IP" CONFIG_UP="$UPSTREAM_ROUTER" CONFIG_TVS="$TVS" python3 - <<'PY' >/dev/null 2>&1
+import ipaddress
+import os
+lan = ipaddress.ip_network(os.environ["CONFIG_LAN"], strict=False)
+for key in ("CONFIG_GW", "CONFIG_UP"):
+    ipaddress.ip_address(os.environ[key])
+for value in os.environ["CONFIG_TVS"].split():
+    if ipaddress.ip_address(value) not in lan:
+        raise ValueError("TV outside LAN_SUBNET")
+PY
+then
+  echo "ERROR: invalid IPv4 address/subnet in $TVGUARD_ENV" >&2
+  exit 4
+fi
 
 echo "Disabling TVGuard (only the tvguard footprint)..."
 
-# 1. Remove ONLY our nft table.
+# 1. Remove only the project-owned nftables table.
 if nft list table ip tvguard >/dev/null 2>&1; then
   nft delete table ip tvguard && echo "  - removed nft table ip tvguard"
 else
   echo "  - nft table ip tvguard not present (nothing to remove)"
 fi
 
-# 1b. Remove ONLY our per-TV ufw route rules (added by tvguard-apply.sh).
-#     These live in ufw-user-forward as `-s <tv> -j ACCEPT`. Only a rule whose
-#     source is one of our configured TV IPs is deleted.
+# 1b. Remove only route allowances whose source is a configured TV.
 for tv in $TVS; do
-  if iptables -t filter -S ufw-user-forward 2>/dev/null | grep -E -q -- "-s $tv(/32)? -j ACCEPT"; then
+  tv_re=${tv//./\\.}
+  if iptables -t filter -S ufw-user-forward 2>/dev/null | grep -Eq -- "-s $tv_re(/32)? .* -j ACCEPT|-s $tv_re(/32)? -j ACCEPT"; then
     if ufw route delete allow from "$tv" to any >/dev/null 2>&1; then
       echo "  - removed ufw route rule for $tv"
     else
@@ -52,7 +69,7 @@ for tv in $TVS; do
   fi
 done
 
-# 2. Restore baseline sysctls (captured at first apply).
+# 2. Restore the baseline captured by tvguard-apply.sh.
 if [ -f "$STATE_DIR/sysctl.baseline" ]; then
   while IFS='=' read -r k v; do
     [ -z "$k" ] && continue
@@ -60,29 +77,29 @@ if [ -f "$STATE_DIR/sysctl.baseline" ]; then
   done < "$STATE_DIR/sysctl.baseline"
   rm -f "$STATE_DIR/sysctl.baseline"
 else
-  # No baseline: safely restore send_redirects if we zeroed it; leave ip_forward alone.
-  cur=$(sysctl -n net.ipv4.conf."$LAN_INTERFACE".send_redirects 2>/dev/null || echo 1)
+  # Without a baseline, restore only the interface redirect setting TVGuard owns.
+  cur=$(sysctl -n "net.ipv4.conf.$LAN_INTERFACE.send_redirects" 2>/dev/null || echo 1)
   if [ "$cur" = "0" ]; then
     sysctl -w "net.ipv4.conf.$LAN_INTERFACE.send_redirects=1" >/dev/null 2>&1 && \
       echo "  - restored net.ipv4.conf.$LAN_INTERFACE.send_redirects=1"
   fi
 fi
 
-# 3. Remove our sysctl files.
+# 3. Remove only TVGuard's sysctl files.
 rm -f /etc/sysctl.d/99-tvguard.conf "$STATE_DIR/sysctl.conf" 2>/dev/null
-echo "  - removed our sysctl files"
+echo "  - removed TVGuard sysctl files"
 
-# 4. Stop + disable the unit (if present).
+# 4. Stop and disable only the project unit.
 if [ -f /etc/systemd/system/tvguard.service ]; then
-  systemctl stop   tvguard.service >/dev/null 2>&1 || true
+  systemctl stop tvguard.service >/dev/null 2>&1 || true
   systemctl disable tvguard.service >/dev/null 2>&1 || true
   echo "  - stopped/disabled tvguard.service"
 fi
 
-# 5. Clear the active marker + state so it does not re-apply at boot.
+# 5. Clear runtime markers so boot cannot re-apply the base gateway.
 rm -f "$STATE_DIR/active" "$STATE_DIR/state" 2>/dev/null
 echo "  - cleared TVGuard state"
 
 echo
-echo "Done. TVGuard is disabled. If you had pointed a TV at this box,"
-echo "revert it to: gateway=<upstream, e.g. 192.168.0.1>, DNS=automatic."
+echo "Done. TVGuard is disabled. For any TV that used this box, set"
+echo "gateway=$UPSTREAM_ROUTER and DNS=automatic to restore its direct path."

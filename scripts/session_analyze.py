@@ -264,7 +264,7 @@ def main():
     for name, d in deltas.items():
         L.append(f"| {name} | {d['delta_pkts']} | {d['delta_bytes']} |")
     L.append("")
-    L.append("_Note: flows to other 192.168.0.x devices do not traverse this box (layer-2 "
+    L.append("_Note: flows to other LAN devices do not traverse this box (layer-2 "
              "PoC limitation) and therefore do NOT appear here. TLS/QUIC payloads are not "
              "captured; only flow/DNS metadata._")
     with open(f"{outdir}/summary.md", "w", encoding="utf-8") as fh:

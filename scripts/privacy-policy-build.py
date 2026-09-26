@@ -4,10 +4,11 @@ privacy-policy-build.py - resolve the privacy policy configs to IPs (per vendor)
 
 Multi-vendor privacy engine (see config/privacy-instances.yaml):
 each vendor (samsung, lg, ...) is an INDEPENDENT policy instance with its own
-  policy file            (explicit tiered denies: ACR / ads / telemetry / voice)
-  keep file              (global keep overrides - keep wins, IP-level)
-  manufacturer file      (deny-by-default vendor-owned zones)
-  manufacturer-keep file (essential vendor allowlist -> group-scoped allow rows)
+  targets_key             (machine targets from config/tvguard.conf)
+  policy file             (explicit tiered denies: ACR / ads / telemetry / voice)
+  keep file               (global keep overrides - keep wins, IP-level)
+  manufacturer file       (deny-by-default vendor-owned zones)
+  manufacturer-keep file  (essential vendor allowlist -> group-scoped allow rows)
 
 Samsung files stay where they always were (config/privacy-policy.yaml etc.);
 LG lives under config/lgtv/. The resolved output is:
@@ -48,6 +49,8 @@ import sys
 import time
 
 import yaml
+
+from tvguard_target_config import TargetConfigError, load_target_config
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INSTANCES = os.path.join(ROOT, "config", "privacy-instances.yaml")
@@ -158,7 +161,7 @@ def collect_tier_entries(doc):
     return dedupe(std), dedupe(senv), dedupe(voice), dedupe(strict), doh
 
 
-def build_vendor(vname, vcfg, resolver, cache):
+def build_vendor(vname, vcfg, targets, resolver, cache):
     """Resolve one vendor instance completely. Returns the vendor section dict."""
     policy = yaml.safe_load(open(os.path.join(ROOT, vcfg["policy"]), encoding="utf-8"))
     keep = yaml.safe_load(open(os.path.join(ROOT, vcfg["keep"]), encoding="utf-8"))
@@ -306,7 +309,9 @@ def build_vendor(vname, vcfg, resolver, cache):
 
     return {
         "label": vcfg.get("label", vname),
-        "applies_to": [str(x) for x in (policy.get("applies_to") or [])],
+        "targets_key": vcfg["targets_key"],
+        "active": bool(targets),
+        "applies_to": list(targets),
         "standard": standard,
         "standard-no-voice": senv,
         "voice": voice,
@@ -326,6 +331,10 @@ def main():
     instances = inst.get("instances") or {}
     if not instances:
         sys.exit("FATAL: no instances in config/privacy-instances.yaml")
+    try:
+        target_config = load_target_config(instances, root=ROOT)
+    except TargetConfigError as exc:
+        sys.exit("FATAL: %s" % exc)
 
     # Cross-vendor registry sanity: two vendors must never share a zone (a
     # shared zone would make the per-vendor allow/deny semantics ambiguous).
@@ -344,21 +353,22 @@ def main():
     cache = {}
     vendors = {}
     for vname, vcfg in instances.items():
+        targets = target_config.vendor_targets[vname]
+        status = ", ".join(targets) if targets else "<empty - inactive>"
         print("=== vendor: %s (%s) ===" % (vname, vcfg.get("label", "")))
+        print("Targets (%s): %s" % (vcfg["targets_key"], status))
         print("Resolving keep-list + policy domains via %s ..." % resolver)
-        vendors[vname] = build_vendor(vname, vcfg, resolver, cache)
+        vendors[vname] = build_vendor(vname, vcfg, targets, resolver, cache)
 
     s = vendors["samsung"] if "samsung" in vendors else None
 
     result = {
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "resolver": resolver,
-        "note": "Multi-vendor privacy policy. Per-vendor sections under "
+        "note": "Multi-vendor privacy policy. Per-vendor sections are under "
                 "'vendors'. Top-level keys (standard, ... , applies_to) are "
                 "LEGACY ALIASES mirroring the samsung instance for older "
-                "consumers - use vendors.<vendor> for new code. IPv4 only: "
-                "this deployment has no usable IPv6 Internet path "
-                "(verified 2026-09: link-local only, no RA, no v6 default route).",
+                "consumers; use vendors.<vendor> for new code.",
         "vendors": vendors,
     }
     if s:
@@ -421,9 +431,10 @@ def main():
         senv = v["standard-no-voice"]
         md.append("# vendor: %s" % vname)
         md.append("")
-        md.append("Scope (applies_to): %s | Pi-hole group: %s | zones: %d | allow rows: %d"
-                  % (", ".join(v["applies_to"]) or "<empty - vendor inactive>",
-                     v["pihole_group"], len(v["manufacturer-zones"]), len(mlock["allows"])))
+        md.append("Targets (%s): %s | status: %s | Pi-hole group: %s | zones: %d | allow rows: %d"
+                  % (v["targets_key"], ", ".join(v["applies_to"]) or "<empty>",
+                     "active" if v["active"] else "inactive", v["pihole_group"],
+                     len(v["manufacturer-zones"]), len(mlock["allows"])))
         md.append("")
         md.append(section_md("%s / standard" % vname, v["standard"]))
         md.append(section_md("%s / standard-no-voice" % vname, senv))

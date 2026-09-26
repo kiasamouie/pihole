@@ -1,9 +1,9 @@
-# REVIEW BEFORE BLOCKING — Samsung QE65Q75CATXXU (192.168.0.197)
+# REVIEW BEFORE BLOCKING — Samsung Q-series QLED TV (<SAMSUNG_TV_IP>)
 
 **Purpose:** human/ChatGPT review of what the Samsung actually talked to during the 2026-09-20/21 baseline captures.
 **These are REVIEW CATEGORIES ONLY. They are NOT firewall rules. They are NOT Pi-hole denylist changes. Nothing has been or will be blocked from this document without a separate, explicit, per-item test phase.**
 
-Method: 6 labelled 10-min sessions captured through the TVGuard one-arm gateway in MONITOR mode (DNS via Pi-hole, all attributed to `.197`, 325 queries / 46 domains, 0 blocked). Cross-session comparison in `reports/06-session-comparison.md`; full evidence in `reports/06-samsung-live-baseline.md`.
+Method: 6 labelled 10-min sessions captured through the TVGuard one-arm gateway in MONITOR mode (DNS via Pi-hole, all attributed to the Samsung client, 325 queries / 46 domains, 0 blocked). Cross-session comparison with `scripts/compare-tv-sessions.py`; full evidence in the labelled session recordings under `captures/`.
 
 **Caveats on the dataset itself:**
 - `plex`, `voice`, `standby` sessions had **no real interaction** (TV silent / left on). Their data is "unattended TV on", not those activities.
@@ -31,7 +31,7 @@ Block any of these and the TV or its apps break. Do not touch.
 | `mediaservices.cdn-apple.com` (NTLI) + mDNS `224.0.0.251:5353` + LAN `:32400` flow | casting window | casting/mirroring (Apple or Plex) | medium |
 | `d1itljbfuaik2i.cloudfront.net` | casting 2 | generic AWS CDN (app content) | low |
 | `:5229` TCP channels (AWS: 52.31.x, 54.89.x, 63.34.x, 108.128.x, 34.x) | persistent, very high reply volume, every active window | Samsung service channels — **unverified purpose, keep until characterised** | low |
-| `194.168.4.100:53` (Virgin resolver) | 3× UDP/53 in idle | TV trying to use vendor DNS — **handled by transparent DNAT to Pi-hole, not a block candidate** | high (that it happened) |
+| `194.168.4.100:53` (ISP resolver) | 3× UDP/53 in idle | TV trying to use vendor DNS — **handled by transparent DNAT to Pi-hole, not a block candidate** | high (that it happened) |
 
 ## UNKNOWN / NEED MORE DATA
 
@@ -39,7 +39,7 @@ Block any of these and the TV or its apps break. Do not touch.
 |---|---|---|---|
 | `fc.samsungcloud.tv` (216.137.53.x) | 30 queries in casting (heaviest Samsung domain) | purpose unverified; burst when apps opened | research + a repeat app-launch session |
 | `mobile-data.onetrust.io` (Cloudflare) | 2 queries in casting | OneTrust consent platform, but which app's consent? | more sessions |
-| `213.104.27.12/13` (Virgin/NTLI) | idle flows | possibly Hub-adjacent service | identify the requesting domain |
+| `213.104.27.12/13` (ISP/NTLI) | idle flows | possibly router-adjacent service | identify the requesting domain |
 | `global.telemetry.insights.video.a2z.com`, `api.amazonvideo.com`, `qgmg.api.amazonvideo.com`, `avpk-*.zaz.api.amazonvideo.com`, `minerva.devices.a2z.com` (AWS) | live query log 09-21 (Prime Video app was open) — **not in any baseline session** | name suggests Prime Video API + telemetry; unverified | run an `amazonvideo` session |
 | `:5229` channels (also listed above) | — | — | see above |
 

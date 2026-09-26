@@ -371,7 +371,7 @@ destinations:
   - domain: mediaservices.cdn-apple.com
     ip: ""
     class: likely-essential
-    evidence: "casting 2 queries; 62.253.3.x (UK NTLI); observed in the same window as mDNS 224.0.0.251:5353 and a local 192.168.0.128:32400 (Plex) flow - consistent with screen-mirroring/casting from an Apple device or the Apple TV app"
+    evidence: "casting 2 queries; 62.253.3.x (UK NTLI); observed in the same window as mDNS 224.0.0.251:5353 and a local LAN Plex flow on :32400 - consistent with screen-mirroring/casting from an Apple device or the Apple TV app"
     source: "direct observation + RDAP (NTLI hosting); Apple media services CDN"
     reason: "Apple media/mirroring content during casting"
     confidence: medium
@@ -508,7 +508,7 @@ destinations:
   - domain: 194.168.4.100
     ip: 194.168.4.100
     class: unknown
-    evidence: "idle 3 UDP/53 packets dst=194.168.4.100 (Virgin Media internal resolver, RDAP: VIRGIN-MEDIA/AS5089 - same resolver as kiaserver's own /etc/resolv.conf). Transparently DNATed to Pi-hole by TVGuard prerouting in monitor mode."
+    evidence: "idle 3 UDP/53 packets dst=194.168.4.100 (Virgin Media internal resolver, RDAP: VIRGIN-MEDIA/AS5089 - same resolver as the box's own /etc/resolv.conf). Transparently DNATed to Pi-hole by TVGuard prerouting in monitor mode."
     source: "TVGUARD-NEW kernel log + nft table + RDAP"
     reason: "stale DHCP DNS or app-level override trying to bypass Pi-hole; redirect works, not blocked"
     confidence: high

@@ -38,19 +38,22 @@ ALIAS="${1:-}"
 OFFLINE_MIN="${2:-5}"
 POST_MIN="${3:-10}"
 
-if [ "$(id -u)" -ne 0 ]; then echo "run with sudo"; exit 3; fi
+if [ "$(id -u)" -ne 0 ]; then echo "run with sudo" >&2; exit 3; fi
 
-# source TV IP from config
-. "$ROOT/config/tvguard.conf" 2>/dev/null || { echo "config/tvguard.conf missing"; exit 4; }
+# machine config (TVGUARD_ENV > $ROOT/.env > legacy config/tvguard.conf)
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/_tvguard_env.sh" || exit 4
+first_of(){ echo "$1" | awk 'NR==1'; }
 case "$ALIAS" in
-  samsung) TV_IP="${SAMSUNG_IP:-}"; TV_NAME="Samsung" ;;
-  google)  TV_IP="${GOOGLE_TV_IP:-}"; TV_NAME="Google TV" ;;
-  lg)      TV_IP="${LG_IP:-}"; TV_NAME="LG" ;;
+  samsung) TV_IP=$(first_of "${SAMSUNG_TVS:-${SAMSUNG_IP:-}}"); TV_NAME="Samsung" ;;
+  google)  TV_IP=$(first_of "${GOOGLE_TVS:-${GOOGLE_TV_IP:-}}"); TV_NAME="Google TV" ;;
+  lg)      TV_IP=$(first_of "${LG_TVS:-${LG_IP:-}}"); TV_NAME="LG" ;;
   *) echo "usage: tv-offline-reconnect-test.sh <samsung|google|lg> [offline-min] [post-min]"; exit 4 ;;
 esac
-[ -n "$TV_IP" ] || { echo "no IP for alias $ALIAS in config"; exit 4; }
-LAN="${LAN_SUBNET:-192.168.0.0/24}"
-IFACE="${LAN_INTERFACE:-enp2s0}"
+[ -n "$TV_IP" ] || { echo "no IP for alias $ALIAS in machine config ($TVGUARD_ENV)"; exit 4; }
+LAN="$LAN_SUBNET"
+IFACE="$LAN_INTERFACE"
+[ -n "$LAN" ] && [ -n "$IFACE" ] || { echo "LAN_SUBNET/LAN_INTERFACE missing from machine config"; exit 4; }
 
 TS=$(date -u +%Y%m%d-%H%M%S)
 OUTDIR="$ROOT/data/offline-reconnect/$TS"

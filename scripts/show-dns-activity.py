@@ -3,7 +3,7 @@
 
 Usage:
   scripts/show-dns-activity.py              # top domains + top clients, all time
-  scripts/show-dns-activity.py 192.168.0.197 # all queries from one client IP
+  scripts/show-dns-activity.py <TV_IP>  # all queries from one client IP
   scripts/show-dns-activity.py --recent      # last 100 queries (all clients)
 
 Reads ADMIN_PASSWORD from .env (never printed). Read-only.

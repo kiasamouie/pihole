@@ -21,9 +21,9 @@
 #   actually get a chance to bite.
 #
 # Usage:
-#   sudo scripts/privacy-reset-tv-voice-state.sh                 # Samsung (.197)
-#   sudo scripts/privacy-reset-tv-voice-state.sh lg               # LG vendor (first applies_to)
-#   sudo scripts/privacy-reset-tv-voice-state.sh 192.168.0.90    # another TV (samsung vendor)
+#   sudo scripts/privacy-reset-tv-voice-state.sh                 # Samsung (first configured target)
+#   sudo scripts/privacy-reset-tv-voice-state.sh lg               # LG vendor (first configured target)
+#   sudo scripts/privacy-reset-tv-voice-state.sh <TV_IP>          # explicit TV IP (samsung vendor)
 #   sudo scripts/privacy-reset-tv-voice-state.sh --flush-dns-cache
 #       (also flush the Pi-hole DNS cache first; harmless - everything
 #       simply re-resolves. Off by default.)
@@ -47,18 +47,20 @@ for a in "$@"; do
   esac
 done
 
-# default: first applies_to entry of the vendor's policy
+# default: first configured target of the vendor from the machine config
 if [ -z "$TV" ]; then
   TV=$(VENDOR_ROOT="$ROOT" VENDOR="$VENDOR" python3 -c '
-import os
-import yaml
-inst = yaml.safe_load(open(os.environ["VENDOR_ROOT"] + "/config/privacy-instances.yaml"))["instances"][os.environ["VENDOR"]]
-doc = yaml.safe_load(open(os.environ["VENDOR_ROOT"] + "/" + inst["policy"]))
-t = (doc.get("applies_to") or ["192.168.0.197"])
+import os, sys, yaml
+sys.path.insert(0, os.environ["VENDOR_ROOT"] + "/scripts")
+from tvguard_target_config import load_target_config
+root = os.environ["VENDOR_ROOT"]; v = os.environ["VENDOR"]
+inst = yaml.safe_load(open(root + "/config/privacy-instances.yaml"))["instances"]
+tc = load_target_config(inst)
+t = tc.vendor_targets.get(v) or []
 print(t[0] if t else "")
 ')
 fi
-[ -n "$TV" ] || { echo "vendor $VENDOR has no applies_to client - pass the TV IP explicitly" >&2; exit 5; }
+[ -n "$TV" ] || { echo "vendor $VENDOR has no configured TV target - pass the TV IP explicitly" >&2; exit 5; }
 echo "target TV: $TV (vendor: $VENDOR)"
 
 if [ "$FLUSH_DNS" = "1" ]; then

@@ -66,10 +66,16 @@ if code != 200:
     sys.exit("Pi-hole login failed: %s" % res)
 SID = res["session"]["sid"]
 
-# vendor config paths from the registry; target TV: first applies_to entry
+# vendor config paths from the registry; target TV: first target of the
+# vendor in the machine config (no household IPs hardcoded)
 inst = (yaml.safe_load(open(os.path.join(ROOT, "config", "privacy-instances.yaml"))).get("instances") or {})[VENDOR]
-doc = yaml.safe_load(open(os.path.join(ROOT, inst["policy"])))
-TV = str((doc.get("applies_to") or ["192.168.0.197"])[0])
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+from tvguard_target_config import load_target_config
+tc = load_target_config((yaml.safe_load(open(os.path.join(ROOT, "config", "privacy-instances.yaml"))).get("instances") or {}))
+targets = tc.vendor_targets.get(VENDOR) or []
+TV = str(targets[0]) if targets else ""
+if not TV:
+    sys.exit("vendor %s has no TV target in the machine config - nothing to show" % VENDOR)
 
 # classification sets
 manuf = yaml.safe_load(open(os.path.join(ROOT, inst["manufacturer"])))

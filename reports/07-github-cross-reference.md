@@ -1,4 +1,4 @@
-# 07 — GitHub / Blocklist Cross-Reference (Samsung QE65Q75CATXXU)
+# 07 — GitHub / Blocklist Cross-Reference (Samsung Tizen TV)
 
 Generated: 2026-09-21 (system clock). Method: local snapshots under
 `research/github/snapshots/` cross-referenced against (a) our own six-session

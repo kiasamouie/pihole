@@ -1,26 +1,30 @@
-# Pi-hole v6 (Docker) — kiaserver
+# Pi-hole v6 (Docker) - the TVGuard box's DNS + privacy sink.
 # Docs: https://docs.pi-hole.net/docker/  https://docs.pi-hole.net/docker/configuration/
 #
 # Design notes:
 # - Pinned to a specific stable image tag (2026.09.0 = FTL v6.7.1, includes
 #   security fixes for GHSA-2794-hrj8-5jg9 and others). No `latest`, no `nightly`.
-# - Host ports 53/tcp+53/udp and 3001/tcp are ALREADY allowed by the existing
-#   UFW policy (192.168.0.0/24) from a previous AdGuard Home plan — no UFW changes needed.
-# - 3001/tcp on the host maps to the Pi-hole web UI (container port 80).
-#   The container's self-signed HTTPS (443) is intentionally NOT published.
+# - Host ports 53/tcp+udp and 3001/tcp are published on PIHOLE_BIND_IP (this
+#   box's LAN IP, from .env) so they are not reachable on other interfaces in
+#   dual-NIC/public-WAN deployments. 3001/tcp is ALWAYS additionally bound on
+#   loopback for the local API (scripts, health checks).
+#   The upstream host firewall (UFW) must allow 53/tcp+udp and 3001/tcp from
+#   the LAN subnet only; bootstrap verifies, it never configures UFW itself.
+# - 3443/tcp maps the container's self-signed HTTPS admin (443). Browsers show
+#   a cert warning (CN=pi.hole) - expected for a self-hosted admin.
 # - DHCP is DISABLED: no 67/udp mapping, no NET_ADMIN capability.
-#   The Virgin hub remains the DHCP server.
+#   The upstream router remains the only DHCP server.
 # - Config/state persists in ./etc-pihole (git-ignored).
 # - Admin password comes from .env (git-ignored, mode 600) via
-#   FTLCONF_webserver_api_password — the v6 "single source of truth" mechanism.
+#   FTLCONF_webserver_api_password - the v6 "single source of truth" mechanism.
 
 services:
   pihole:
     container_name: pihole
     image: pihole/pihole:2026.09.0
     environment:
-      TZ: ${TZ}
-      FTLCONF_webserver_api_password: ${ADMIN_PASSWORD}
+      TZ: ${TZ:-UTC}
+      FTLCONF_webserver_api_password: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
       # Upstream resolvers: Cloudflare (primary), Quad9 (secondary; also
       # provides upstream malware-domain blocking). Both are maintained,
       # privacy-respecting, and do not serve ads/telemetry for lookups.
@@ -29,13 +33,11 @@ services:
       # interface inside the container (required in bridge mode).
       FTLCONF_dns_listeningMode: ALL
     ports:
-      - "53:53/tcp"
-      - "53:53/udp"
-      - "3001:80/tcp"
-      # Self-signed HTTPS admin (container 443). Browsers show a cert
-      # warning (CN=pi.hole) - expected for a self-hosted admin.
-      # See reports/05-tvguard-gateway.md for the rationale.
-      - "3443:443/tcp"
+      - "${PIHOLE_BIND_IP:-0.0.0.0}:53:53/tcp"
+      - "${PIHOLE_BIND_IP:-0.0.0.0}:53:53/udp"
+      - "${PIHOLE_BIND_IP:-0.0.0.0}:3001:80/tcp"
+      - "127.0.0.1:3001:80/tcp"
+      - "${PIHOLE_BIND_IP:-0.0.0.0}:3443:443/tcp"
     volumes:
       - ./etc-pihole:/etc/pihole
     restart: unless-stopped

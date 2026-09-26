@@ -1,4 +1,4 @@
-# 08 — Offline / Buffer-then-Upload Threat Model (Samsung QE65Q75CATXXU)
+# 08 — Offline / Buffer-then-Upload Threat Model (Samsung Tizen TV)
 
 Status: threat model + detection design. **No live experiment has been run yet.**
 The test script `scripts/tv-offline-reconnect-test.sh` is prepared, reviewed, and
@@ -59,7 +59,7 @@ as "proof Samsung does it" would be a category error. What IS true and useful:
    `*.samsungacr.com` or telemetry endpoints immediately after reconnect — that
    did not occur during the offline window — is exactly the observable signature
    of "store while offline → upload after reconnect".
-3. **Containment**: because all TV Internet traffic traverses kiaserver (NAT path
+3. **Containment**: because all TV Internet traffic traverses this box (NAT path
    proven, reports/05/06), any such upload MUST cross our egress point. We can
    deny, log, or throttle it per destination — we do not need to read the payload
    to stop it.
@@ -77,11 +77,11 @@ It never says "transcripts", "audio", or "what was recorded".
 `scripts/tv-offline-reconnect-test.sh samsung [offline-min] [post-min]`
 
 1. Pre-check: Samsung must currently route through this host (conntrack must show
-   live entries for 192.168.0.197). If not, the script refuses to run (nothing
+   live entries for <SAMSUNG_TV_IP>). If not, the script refuses to run (nothing
    to observe, and we don't want a false "no buffering" result).
 2. Baseline snapshot: recent conntrack + journal.
 3. **Phase 1 (offline):** one temporary nftables rule at position 1 of the
-   `tvguard` forward chain — `ip saddr 192.168.0.197 ip daddr != 192.168.0.0/24
+   `tvguard` forward chain — `ip saddr <SAMSUNG_TV_IP> ip daddr != <LAN_SUBNET>
    ct state new ... drop`. LAN traffic (Plex, EPG, casting, the hub) is
    unaffected by design. All dropped WAN attempts are kernel-logged with the
    `TVGUARD-OFFTEST` prefix.

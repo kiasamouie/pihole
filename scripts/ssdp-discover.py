@@ -54,9 +54,31 @@ def listen(dur):
     return seen
 
 if __name__ == "__main__":
-    # Unicast M-SEARCH to known LAN hosts (many TV/embedded devices ignore
-    # multicast M-SEARCH and only answer unicast probes).
-    targets = [f"192.168.0.{i}" for i in (1, 32, 83, 90, 147, 181, 187, 197, 206, 212, 225)]
+    # Standard multicast M-SEARCH to the SSDP all-programs group. Many
+    # TV/embedded devices also answer unicast probes, so the LAN's first
+    # 100 hosts are probed too - derived from the machine config's
+    # LAN_SUBNET (never a hardcoded household inventory).
+    targets = [BADDR]
+    try:
+        import os as _os
+        sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+        from tvguard_target_config import TargetConfigError, load_target_config
+        import yaml
+        _here = _os.path.dirname(_os.path.abspath(__file__))
+        with open(_os.path.join(_here, "..", "config", "privacy-instances.yaml"), encoding="utf-8") as _fh:
+            _inst = (yaml.safe_load(_fh) or {}).get("instances") or {}
+        _tc = load_target_config(_inst)
+        import ipaddress as _ip
+        _net = _ip.ip_network(_tc.values.get("LAN_SUBNET", ""), strict=False)
+        if _net.prefixlen <= 24:
+            _limit = min(100, _net.num_addresses - 2)
+            for _i in range(_limit):
+                _a = int(_net.network_address) + 1 + _i
+                if _a >= int(_net.broadcast_address):
+                    break
+                targets.append(str(_ip.ip_address(_a)))
+    except (TargetConfigError, ValueError, OSError):
+        pass  # multicast-only discovery still works
     s = msearch("ssdp:all", targets)
     s.settimeout(0.5)
     devices = listen(timeout)

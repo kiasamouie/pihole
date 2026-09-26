@@ -35,10 +35,6 @@
 #     our own capture still qualify (observed on THIS TV) but are marked so.
 #   * Domains in config/privacy-keep.yaml override everything (keep wins).
 #
-applies_to:
-  - "192.168.0.197"      # Samsung QE65Q75CATXXU - first target
-  # 192.168.0.90 (Google TV) is deliberately NOT included: it still uses the
-  # Hub as gateway. Add it here only once it is also pointed at .128.
 
 updated: "2026-09-21"
 version: 1

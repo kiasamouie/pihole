@@ -24,17 +24,16 @@ set -uo pipefail
 if [ "$(id -u)" -ne 0 ]; then echo "run with sudo"; exit 3; fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# GATEWAY_IP for the SNAT evidence check: from config when present, fallback to
-# the documented default (repo lives on any path; nothing else is hardcoded).
-GW_CHECK=192.168.0.128
-if [ -f "$ROOT/config/tvguard.conf" ]; then
-  GW_CHECK=$(sed -n 's/^GATEWAY_IP=//p' "$ROOT/config/tvguard.conf" | head -1)
-  [ -n "$GW_CHECK" ] || GW_CHECK=192.168.0.128
-fi
+# machine config (TVGUARD_ENV > $ROOT/.env > legacy config/tvguard.conf);
+# GATEWAY_IP is the box IP the mock TV's traffic is SNAT'd to.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/_tvguard_env.sh" || exit 4
+GW_CHECK="$GATEWAY_IP"
+[ -n "$GW_CHECK" ] || { echo "GATEWAY_IP missing from machine config" >&2; exit 4; }
 
 NS=tvg; VETH_HG=veth-hg; VETH_TV=veth-tv
 NSIP=10.99.99.2; HOSTIP=10.99.99.1
-LAN=192.168.0.0/24
+MOCK_LAN=10.99.99.0/24   # the throwaway mock network (never the real LAN)
 PIHOLE=127.0.0.1
 STATE_DIR=/var/lib/tvguard; mkdir -p "$STATE_DIR" 2>/dev/null
 PASS=0; FAIL=0
@@ -87,20 +86,20 @@ table ip tvguard-test {
     set tvs { type ipv4_addr ; elements = { $NSIP } ; }
     chain forward {
         type filter hook forward priority -150 ;
-        ip saddr @tvs ip daddr $LAN counter accept
-        ip saddr @tvs ip daddr != $LAN ct state new counter log prefix "TGT-NEW " accept
-        ip saddr @tvs ip daddr != $LAN counter accept
+        ip saddr @tvs ip daddr $MOCK_LAN counter accept
+        ip saddr @tvs ip daddr != $MOCK_LAN ct state new counter log prefix "TGT-NEW " accept
+        ip saddr @tvs ip daddr != $MOCK_LAN counter accept
         ip daddr @tvs ct state established,related counter accept
         counter continue
     }
     chain prerouting {
         type nat hook prerouting priority -150 ;
-        ip saddr @tvs ip daddr != $LAN meta l4proto udp th dport 53 dnat to $CIP:53
-        ip saddr @tvs ip daddr != $LAN meta l4proto tcp th dport 53 dnat to $CIP:53
+        ip saddr @tvs ip daddr != $MOCK_LAN meta l4proto udp th dport 53 dnat to $CIP:53
+        ip saddr @tvs ip daddr != $MOCK_LAN meta l4proto tcp th dport 53 dnat to $CIP:53
     }
     chain postrouting {
         type nat hook postrouting priority srcnat ;
-        ip saddr @tvs ip daddr != $LAN oifname "enp2s0" counter masquerade
+        ip saddr @tvs ip daddr != $MOCK_LAN oifname "$LAN_INTERFACE" counter masquerade
     }
 }
 EOF

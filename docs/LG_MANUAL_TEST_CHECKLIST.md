@@ -1,7 +1,7 @@
 # LG TV Manual Test Checklist (after enabling an LG privacy profile)
 
 For: the LG webOS TV (address assigned after network discovery; gateway + DNS =
-`192.168.0.128`).
+`<TVGUARD_IP>`).
 
 **Target profile: `manufacturer-lockdown` (LG).** Expected results: everything
 EXCEPT **cloud voice** and **ThinQ cloud** must work. Alphonso ACR, LG ads and
@@ -14,7 +14,7 @@ Run these tests in order **after** `sudo scripts/privacy-live-check.sh lg`
 passes. For each test: what you do, what is PASS, what is FAIL, and the server
 diagnostic. Replace `<LGIP>` with the TV's confirmed address.
 
-Useful server diagnostics (from kiaserver):
+Useful server diagnostics (from the TVGuard box):
 
 ```bash
 python3 scripts/show-dns-activity.py <LGIP>      # recent DNS queries from the LG (with results)
@@ -84,7 +84,7 @@ sudo scripts/privacy-watch.sh 30                  # 30-minute safety watch (both
 - **PASS:** cast starts and plays.
 - **FAIL:** TV not found or cast fails.
 - **Diagnose:** casting is mostly LAN-local; confirm the phone and LG are on the
-  same LAN segment (both behind the hub) and that the TV is reachable. The
+  same LAN segment (both behind the upstream router) and that the TV is reachable. The
   privacy policy does not filter LAN traffic.
 
 ## 8. LG Content Store

@@ -1,4 +1,4 @@
-# kiaserver TV-privacy PoC (TVGuard)
+# TV-privacy PoC on the TVGuard box (TVGuard)
 
 Proof-of-concept (built like a prod setup) for controlling smart-TV outbound
 traffic on a home LAN — **and reproducible on a dedicated machine via git**.
@@ -8,11 +8,11 @@ it is the step-by-step deployment runbook for an agent with terminal access:
 what to discover, the one config file to adapt, what to verify, and exactly
 what to tell the user to do on their router and TV remotes.
 
-Layers (all proven on kiaserver; the future dedicated box inherits this repo):
+Layers (all proven on the TVGuard box; the future dedicated box inherits this repo):
 
 1. **Pi-hole v6** (Docker, pinned image) — DNS logging + per-device groups
 2. **One-arm IPv4 gateway** — selected TVs use this box as gateway/DNS;
-   SNAT/masquerade → Virgin Hub → Internet (return path included)
+   SNAT/masquerade → the upstream router → Internet (return path included)
 3. **nftables egress policy** — a separate, removable `tvguard` table with
    `monitor` (log/count, no deliberate blocks) and `enforce` (tested blocks)
    modes; DNS-bypass attempts transparently redirected to Pi-hole
@@ -21,8 +21,8 @@ Layers (all proven on kiaserver; the future dedicated box inherits this repo):
 5. **Privacy policy (researched, generated, tested)** —
    exact-domain deny policy for the target TV(s) in four profiles
    (`standard` / `standard-no-voice` / `strict` / **`manufacturer-lockdown` —
-   Samsung deny-by-default, the recommended profile, LIVE on the Samsung
-   since 2026-09-22**), resolved to IPs by an external resolver, applied via a
+   Samsung deny-by-default, the recommended profile, active on the Samsung
+   TV**), resolved to IPs by an external resolver, applied via a
    dedicated nftables set **and** a dedicated Pi-hole group, with a documented
    keep-list that overrides everything. Unknown Samsung-owned hosts are denied
    and logged until explicitly reviewed (keep/block). One command on, one off.
@@ -43,8 +43,6 @@ compose.yaml            Docker Compose for Pi-hole (pinned image)
 .env.example            template; scripts/make-env.sh generates .env
 .env                    (git-ignored, 600) admin password
 etc-pihole/             (git-ignored) Pi-hole state
-config/tvguard.conf.example   TVGuard config template (machine-specific)
-config/tvguard.conf   (git-ignored) your live values
 config/destinations.yaml      evidence ledger (classification source of truth)
 config/privacy-policy.yaml    privacy policy source of truth (deny tiers)
 config/privacy-keep.yaml      never-block / keep-list (overrides the policy)
@@ -53,9 +51,8 @@ config/manufacturer-keep.yaml mlock: essential Samsung allow-list (keep wins, do
 research/samsung-ownership.yaml  ownership/CT/RDAP evidence per Samsung zone
 research/                   blocklist snapshots + cross-reference evidence
 reports/                audits, inventory, visibility, TVGuard design, raw evidence
-docs/                   ALL project documentation lives here (18 files)
-  docs/REPORT.md                 full report (read this first)
-  docs/ROUTER_NEXT_STEPS_V2.md   your manual steps only (Hub + Samsung)
+docs/                   ALL project documentation lives here (17 files)
+  docs/ROUTER_NEXT_STEPS_V2.md   your manual steps only (upstream router + Samsung)
   docs/ROLLBACK.md               one-command firewall rollback + full removal
   docs/REVIEW_BEFORE_BLOCKING.md human review dataset (destinations by category)
   docs/FINAL_BLOCKING_PLAN.md    what standard / standard-no-voice / strict block, keep, force, leave working
@@ -72,7 +69,7 @@ docs/                   ALL project documentation lives here (18 files)
   docs/LG_ALLOWED_EGRESS.md       every LG service intentionally still allowed (why)
   docs/LG_BLOCKED_EGRESS.md       everything the LG cannot receive under its lockdown
   docs/LG_SECURITY_STATUS.md      per-vector LG control status
-data/                   lan-inventory.csv; privacy-policy/ + offline-reconnect/ + manufacturer-unknown/ (git-ignored, generated)
+data/                   privacy-policy/ + offline-reconnect/ + manufacturer-unknown/ (git-ignored, generated); the LAN inventory is produced fresh by scripts/discover-lan.sh on the deployment network
 captures/               (git-ignored) tv-session.sh session recordings
 scripts/                see below
 ```
@@ -123,21 +120,19 @@ Full agent runbook: `AGENTS.md` (discovery → config → router steps for the u
 ```bash
 git clone <repo> && cd dns
 sudo ./bootstrap.sh          # installs, deploys Pi-hole, validates, prints TODOs
-# then (if needed) edit config/tvguard.conf for the new NICs/IPs and (when ready):
+# then (if needed) edit .env for the new NICs/IPs and (when ready):
 sudo scripts/tvguard-enable-monitor.sh
 sudo scripts/tvguard-selftest.sh
 ```
 
-**Same network as the current build?** `config/tvguard.conf.example` (tracked)
-already carries this network's values — subnet 192.168.0.0/24, gateway box
-192.168.0.128, Samsung .197 / Google .90. If the new box takes over the
-192.168.0.128 address on the same LAN, bootstrap copies it to
-`config/tvguard.conf` and there is nothing to edit. All scripts locate the repo
-root from their own path (no absolute paths), read the Pi-hole password from
-the local `.env`, and read the Pi-hole state from `config/` — nothing else
-needs adapting on the same network. Steps that remain physical either way:
-reserve the new box's IP in the router, then point the TV(s) at it as
-gateway/DNS (see docs/ROUTER_NEXT_STEPS_V2.md).
+**Same network as the deployed box?** Bootstrap generates `.env` from
+`.env.example` plus discovered host facts (interface, IP, subnet, upstream
+router). If the new box takes over the same address on the same LAN, the
+discovered values are already correct and there is nothing to edit. All
+scripts locate the repo root from their own path (no absolute paths) and read
+the machine config + Pi-hole password from the local `.env`. Steps that
+remain physical either way: reserve the new box's IP in the router, then
+point the TV(s) at it as gateway/DNS (see docs/ROUTER_NEXT_STEPS_V2.md).
 
 ## Privacy policy (enable only when you've reviewed docs/FINAL_BLOCKING_PLAN.md)
 

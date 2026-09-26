@@ -5,27 +5,26 @@ on a new Debian host** — no rewriting. This document is the migration runbook.
 
 ## 0. What carries over / what doesn't
 
-| Carries over (in git) | Stays on kiaserver (not committed) |
+| Carries over (in git) | Stays on the TVGuard box (not committed) |
 |---|---|
 | All scripts, compose.yaml, config templates, deploy unit template, reports, docs | `.env` (admin password — you write the file path down separately) |
-| `config/tvguard.conf.example` (values to be re-set for the new NIC/IP) | `etc-pihole/` (Pi-hole state — optionally move for continuity, see §3) |
+| `.env.example` (template; bootstrap generates `.env` with discovered values) | `etc-pihole/` (Pi-hole state — optionally move for continuity, see §3) |
 | — | `captures/` (session recordings — optionally move to keep your evidence base) |
 | — | `/var/lib/tvguard/` runtime state (regenerated on enable) |
 
 ## 1. Buy a box that fits (requirements summary)
 
 - **2× GbE minimum** (dual-NIC: WAN + LAN). 2.5GbE preferred on the LAN side
-  if budget allows (Plex/HDR streaming + future TV traffic). See REPORT.md §19
-  for the full derivation.
+  if budget allows (Plex/HDR streaming + future TV traffic).
 - Any modern x86_64 mini (Dell/Lenovo/HP Micro/Tiny/SFF), 8 GB RAM (16 GB
   comfortable if you later add Zeek/ntopng), 256 GB SSD minimum.
 - Avoid USB-Ethernet for the WAN/LAN role. Intel NICs (i225/i226 or 82574)
   if you want guaranteed nftables/OFED-free behaviour; onboard realtek works
   too but verify `r8169` on your Debian release.
-- The box becomes: router (NAT) + Pi-hole + TVGuard. kiaserver keeps Plex,
-  backups, Samba, Transmission, invoice stack.
+- The box becomes: router (NAT) + Pi-hole + TVGuard. The TVGuard box keeps
+  Plex, backups, Samba, Transmission, invoice stack.
 
-## 2. Day-of migration (on the new box, before touching the Hub)
+## 2. Day-of migration (on the new box, before touching the upstream router)
 
 ```bash
 # 1. Fresh Debian 13 netinstall (or clone the disk image of the installer you use)
@@ -36,21 +35,20 @@ sudo ./bootstrap.sh
 
 `bootstrap.sh` will: check the OS + free ports (53/3001/3443/8088), install
 packages (Docker via the official apt repo if absent), create `.env` (random
-admin password — **record it**), create `config/tvguard.conf` from the
-example, deploy Pi-hole, run the self-test and group setup, install the
+admin password — **record it**), deploy Pi-hole, run the self-test and group setup, install the
 `tvguard` unit **disabled**, and print the values you still need to set.
 
-Set in `config/tvguard.conf`:
+Set in `.env`:
 
 ```bash
 MODE=dualnic-gateway
-LAN_INTERFACE=enp3s0      # your LAN NIC (name from `ip -br`)
-WAN_INTERFACE=enp2s0      # your WAN NIC
-LAN_SUBNET=192.168.0.0/24
+LAN_INTERFACE=<LAN_NIC>   # your LAN NIC (name from `ip -br`)
+WAN_INTERFACE=<WAN_NIC>   # your WAN NIC
+LAN_SUBNET=<LAN_SUBNET>
 GATEWAY_IP=<new box LAN IP>
 PIHOLE_IP=<same>
-UPSTREAM_ROUTER=192.168.100.1   # or whatever the Hub's LAN IP is in modem mode
-TVS="192.168.0.197 192.168.0.90"
+UPSTREAM_ROUTER=192.168.100.1   # or whatever the upstream router's LAN IP is in modem mode
+TVS="<SAMSUNG_TV_IP> <GOOGLE_TV_IP>"
 ```
 
 `scripts/tvguard-apply.sh` already supports `MODE=dualnic-gateway`: egress
@@ -63,17 +61,17 @@ it.
 
 ```bash
 # Pi-hole continuity (gravity DB, groups, clients, query log):
-scp -r kiaserver:etc-pihole ./etc-pihole     # then docker compose up -d
+scp -r <tvguard-box>:etc-pihole ./etc-pihole     # then docker compose up -d
 # Session evidence base:
-scp -r kiaserver:captures ./captures
+scp -r <tvguard-box>:captures ./captures
 ```
 If you skip this, run `scripts/setup-pihole-groups.py` (bootstrap already did)
 and start the evidence fresh — the methodology is identical.
 
-## 4. Cutover (you, at the Hub — staged, never all-at-once)
+## 4. Cutover (you, at the upstream router — staged, never all-at-once)
 
-1. **Reserve** the new box's WAN + LAN MACs on the Hub.
-2. **Modem mode** on the Hub (or bridge mode). The box gets the public
+1. **Reserve** the new box's WAN + LAN MACs on the upstream router.
+2. **Modem mode** on the upstream router (or bridge mode). The box gets the public
    connection on WAN. (This is the first step that changes live internet —
    do it alone, with everything else on the PoC already proven.)
 3. Bring up the box: static LAN IP, then
@@ -85,15 +83,15 @@ and start the evidence fresh — the methodology is identical.
 5. 24 h observation → enforce phase per that document.
 6. Then (optionally) migrate the other TV, then other devices, one at a time.
 
-## 5. Decommission kiaserver's PoC role (only after 6)
+## 5. Decommission the TVGuard box's PoC role (only after 6)
 
 ```bash
-ssh kia@kiaserver 'cd /home/kia/dns && sudo scripts/tvguard-disable.sh'
+ssh <user>@<tvguard-box> 'cd <repo-root> && sudo scripts/tvguard-disable.sh'
 ```
-- Samsung/Google TV gateway back to the new box (not to the old hub IP).
-- kiaserver reverts to plain LAN host: Plex, backups, Samba, invoice stack
-  untouched throughout — TVGuard's disable is surgical by design.
-- Keep kiaserver's Pi-hole stopped (`docker compose stop pihole`) or remove
+- Samsung/Google TV gateway back to the new box (not to the old router IP).
+- The TVGuard box reverts to a plain LAN host: Plex, backups, Samba, invoice
+  stack untouched throughout — TVGuard's disable is surgical by design.
+- Keep the TVGuard box's Pi-hole stopped (`docker compose stop pihole`) or remove
   per ROLLBACK.md; keep the repo (read-only history + future reference).
 
 ## 6. Post-migration verification (same gates as here)
@@ -101,5 +99,5 @@ ssh kia@kiaserver 'cd /home/kia/dns && sudo scripts/tvguard-disable.sh'
 - `sudo scripts/tvguard-selftest.sh` → all pass on the new box
 - `sudo scripts/tvguard-status.sh` → table + counters + mode correct
 - Samsung: YouTube / Plex / cast / voice all work; TVGUARD-NEW logs appear
-- `scripts/health-check.sh` on kiaserver → Plex/Samba/SSH all still active
+- `scripts/health-check.sh` on the TVGuard box → Plex/Samba/SSH all still active
 - 24 h of clean monitor logs before any enforce step

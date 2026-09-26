@@ -1,6 +1,6 @@
 # What Samsung CANNOT receive (manufacturer-lockdown, live 2026-09-22)
 
-All entries below are enforced on client `192.168.0.197` only, at two layers
+All entries below are enforced on client `<SAMSUNG_TV_IP>` only, at two layers
 where applicable (Pi-hole DNS in group TVGuard-Privacy + resolved-IP firewall
 set `tv_privacy_blocked`, 166 IPs as of 2026-09-22).
 
@@ -46,7 +46,7 @@ sudo scripts/manufacturer-review.sh keep <domain> "reason"   # approve
 sudo scripts/manufacturer-review.sh block <domain> "reason"  # pin a deny
 ```
 
-## DNS bypass / DoT — blocked (scoped to 192.168.0.197)
+## DNS bypass / DoT — blocked (scoped to <SAMSUNG_TV_IP>)
 
 - external UDP/53 + TCP/53 (hard-coded resolvers) → transparently DNAT'd to
   Pi-hole (attributed to the TV)

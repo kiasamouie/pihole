@@ -1,23 +1,23 @@
 # Enabling the privacy policy on the Samsung — exact steps
 
-**Current state (2026-09-22): `manufacturer-lockdown` is ALREADY LIVE** on
-192.168.0.197. If you are re-enabling after a rollback, the recommended
+**Current state: `manufacturer-lockdown` is ALREADY ACTIVE** on
+<SAMSUNG_TV_IP>. If you are re-enabling after a rollback, the recommended
 profile is `manufacturer-lockdown` (this section); `standard-no-voice`
 remains documented below for reference.
 
-## Enabling `manufacturer-lockdown` (recommended — what is live)
+## Enabling `manufacturer-lockdown` (recommended — what is active)
 
 From a clean baseline (policy off):
 
 ```bash
-cd /home/kia/dns
+cd <repo-root>
 sudo scripts/privacy-policy-apply.sh manufacturer-lockdown   # re-resolves + re-renders + re-pushes (idempotent)
 sudo scripts/privacy-reset-tv-manufacturer-state.sh --flush-dns-cache  # expire stale .197 flows to denied mlock IPs + flush Pi-hole DNS cache (per-TV only)
 sudo scripts/privacy-live-check.sh                           # must show 10/10 PASS incl. the two scope lines
 sudo scripts/privacy-watch.sh 30 --auto-rollback             # 30-minute safety watch (separate terminal)
 ```
 
-Expected: `tv_privacy` set = {192.168.0.197} only (Google TV unaffected);
+Expected: `tv_privacy` set = {<SAMSUNG_TV_IP>} only (Google TV unaffected);
 group TVGuard-Privacy = 70 rows (37 exact + 14 regex + 19 allow); 166 deny IPs
 in the firewall; no rule touches 443/UDP-443; unknown Samsung hosts denied +
 logged (review: `sudo scripts/show-unknown-samsung.sh 24`).
@@ -30,10 +30,10 @@ Starting position: you are sitting at your computer. The Samsung is already
 configured with:
 
 ```
-IP       192.168.0.197
+IP       <SAMSUNG_TV_IP>
 Mask     255.255.255.0
-Gateway  192.168.0.128
-DNS      192.168.0.128
+Gateway  <TVGUARD_IP>
+DNS      <TVGUARD_IP>
 ```
 
 `standard-no-voice` = standard (ACR + advertising + high-confidence telemetry +
@@ -53,7 +53,7 @@ SSH or the invoice stack beyond what TVGuard already manages.
 re-apply + voice-state reset:
 
 ```bash
-cd /home/kia/dns
+cd <repo-root>
 sudo scripts/privacy-policy-apply.sh standard-no-voice   # re-resolves + re-renders + re-pushes (idempotent)
 sudo scripts/privacy-reset-tv-voice-state.sh             # expires any open .197<->voice-IP connections (per-TV only)
 sudo scripts/privacy-live-check.sh                       # must show 38 group entries (37 exact + 1 regex)
@@ -64,7 +64,7 @@ sudo scripts/privacy-live-check.sh                       # must show 38 group en
 ## Step 1 — Pre-check
 
 ```bash
-cd /home/kia/dns
+cd <repo-root>
 sudo scripts/tvguard-status.sh
 scripts/health-check.sh
 ```
@@ -80,7 +80,7 @@ top of an unhealthy baseline.
 ## Step 2 — Enable standard-no-voice
 
 ```bash
-cd /home/kia/dns
+cd <repo-root>
 sudo scripts/privacy-policy-apply.sh standard-no-voice
 ```
 
@@ -90,7 +90,7 @@ sudo scripts/privacy-policy-apply.sh standard-no-voice
 - `table ip tvguard` re-rendered with a `tv_privacy_blocked` set and the
   privacy/DoT drop rules (**no** `tv_doh_blocked` set — that is strict-only)
 - Pi-hole group `TVGuard-Privacy` with **38 entries: 37 exact-domain denies +
-  1 regex (the aibixby.com voice-family suffix)**, client `192.168.0.197`
+  1 regex (the aibixby.com voice-family suffix)**, client `<SAMSUNG_TV_IP>`
   attached
 - then run `sudo scripts/privacy-reset-tv-voice-state.sh` once, so no pre-
   existing TV connection to a voice IP survives (it only touches .197's
@@ -154,14 +154,14 @@ through and it gets added in the next iteration.
 
 ```bash
 sudo dmesg | grep -E 'TVGUARD-(PRIVACY|DOT|DOH)' | tail -30
-python3 scripts/show-dns-activity.py 192.168.0.197
+python3 scripts/show-dns-activity.py <SAMSUNG_TV_IP>
 ```
 
 - `TVGUARD-PRIVACY DST=<ip>` = a firewall deny hit (ACR/ad/telemetry/voice IP).
 - `TVGUARD-DOT` = the TV tried DoT (853) and was dropped.
 - `TVGUARD-DOH` should not appear in this profile (DoH-IP set is strict-only).
 - `show-dns-activity.py` shows the DNS layer: blocked domains answer `0.0.0.0`
-  for client `192.168.0.197` and are attributed correctly (not the Docker
+  for client `<SAMSUNG_TV_IP>` and are attributed correctly (not the Docker
   bridge IP).
 
 ## Step 8 — Emergency rollback (if needed)
@@ -205,7 +205,7 @@ identified as transcripts/audio on the network. The script never claims that.
 ## Commands at a glance
 
 ```bash
-cd /home/kia/dns
+cd <repo-root>
 sudo scripts/privacy-policy-apply.sh standard-no-voice   # enable (this is the one action)
 sudo scripts/privacy-live-check.sh                       # verify server side
 sudo scripts/privacy-watch.sh 30 --auto-rollback         # safety watch
