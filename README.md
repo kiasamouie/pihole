@@ -91,6 +91,7 @@ scripts/                see below
 | `scripts/make-env.sh` | create `.env` with a strong random admin password | fresh machine |
 | `scripts/setup-pihole-groups.py` | idempotent per-device groups + client registration | python3 |
 | `scripts/pihole-selftest.py` | local end-to-end Pi-hole test (login, block, allow, query log) | python3 |
+| `scripts/pihole-boot-ready.sh` | boot gate: correct state mount + readable database + healthy Pi-hole | systemd/root |
 | `scripts/discover-lan.sh` | re-run passive LAN discovery, refresh inventory | sudo |
 | `scripts/capture-device.sh` | passive per-device tcpdump (headers, not payloads) | sudo |
 | `scripts/show-dns-activity.py` | per-client DNS activity from the Pi-hole API | python3 |
@@ -118,7 +119,7 @@ scripts/                see below
 Full agent runbook: `AGENTS.md` (discovery → config → router steps for the user → verify → re-enable privacy).
 
 ```bash
-git clone <repo> && cd dns
+git clone <repo> && cd <repo-directory>
 sudo ./bootstrap.sh          # installs, deploys Pi-hole, validates, prints TODOs
 # then (if needed) edit .env for the new NICs/IPs and (when ready):
 sudo scripts/tvguard-enable-monitor.sh
@@ -133,6 +134,24 @@ scripts locate the repo root from their own path (no absolute paths) and read
 the machine config + Pi-hole password from the local `.env`. Steps that
 remain physical either way: reserve the new box's IP in the router, then
 point the TV(s) at it as gateway/DNS (see docs/ROUTER_NEXT_STEPS_V2.md).
+
+**Reboot persistence:** Compose defaults to the project name `tvguard`, and
+bootstrap forces that name even if the calling environment sets a conflicting
+`COMPOSE_PROJECT_NAME`. The required LAN bind comes from `.env`; Pi-hole state
+remains in this clone's ignored `etc-pihole/`. Bootstrap atomically installs
+`deploy/tvguard.service.in` and points its fixed launchers at the current clone,
+including clone paths containing shell/systemd-special characters. On every
+service start, `scripts/pihole-boot-ready.sh` starts Pi-hole, rejects a stale project or
+`/etc/pihole` bind mount, requires a readable `gravity.db`, waits for container
+health, then lets TVGuard resolve the live container IP and load its rules.
+`scripts/health-check.sh` independently checks the persisted mount/database,
+actual published-port binds, restart policy, and installed launcher targets.
+
+If this exact clone is physically moved, run
+`sudo ./bootstrap.sh --migrate-repository-path` from the new location before
+rebooting. The explicit migration accepts the new location only when its
+`gravity.db` is readable and passes SQLite integrity checking, and refuses the
+move if the old mount still contains a different database.
 
 ## Privacy policy (enable only when you've reviewed docs/FINAL_BLOCKING_PLAN.md)
 
@@ -155,11 +174,11 @@ the voice tier carries a scoped `kind: suffix` entry for `aibixby.com` (the
 Bixby/AI-assistant cloud zone — CT analysis proves it is 100% Bixby
 infrastructure and contains no keep-list domain); it is enforced primarily at
 the DNS layer (group-scoped Pi-hole regex) with a resolved-IP set as second
-layer. See reports/09-voice-path-investigation.md. The policy is scoped to
-the TVs in `applies_to` (currently the Samsung .197 only — the firewall
-enforces this via a dedicated `tv_privacy` set, so the Google TV is unaffected
-by any privacy rule) and never touches the gateway path, UFW, Docker, or
-other clients. The manufacturer-lockdown additions are narrow Samsung-zone
+layer. See reports/09-voice-path-investigation.md. Each vendor policy is scoped
+to that vendor's TV list in the machine-local `.env`; the firewall renders a
+dedicated per-vendor client set, so devices absent from that list are
+unaffected by privacy rules. The policy never touches the gateway path, UFW,
+Docker, or other clients. The manufacturer-lockdown additions are narrow Samsung-zone
 regexes (Bixby + 13 documented Samsung zones) with a documented 19-host keep
 list — still no generic cloud/CDN wildcards.
 

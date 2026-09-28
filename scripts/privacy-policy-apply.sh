@@ -63,6 +63,11 @@ case "$TIER" in
   *) echo "usage: privacy-policy-apply.sh <vendor> <standard|standard-no-voice|strict|manufacturer-lockdown>" >&2; exit 4 ;;
 esac
 
+if ip -6 route show default 2>/dev/null | grep -q .; then
+  echo "ERROR: privacy policy not applied: IPv6 default route would bypass IPv4 enforcement" >&2
+  exit 4
+fi
+
 # Vendor metadata and targets come from the registry + machine config.
 VENDOR_META="$(python3 "$SCRIPT_DIR/tvguard_target_config.py" \
   --instances "$ROOT/config/privacy-instances.yaml" vendor-meta "$VENDOR")" || exit 4

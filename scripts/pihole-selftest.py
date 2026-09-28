@@ -39,11 +39,21 @@ TEST_DOMAIN = "iana.org"
 SID = None
 CSRF = None
 
-def get_password():
+def get_env_value(name):
+    prefix = name + "="
     for line in open(ENV_FILE):
-        if line.startswith("ADMIN_PASSWORD="):
-            return line.strip().split("=", 1)[1]
-    raise SystemExit("ADMIN_PASSWORD missing in .env")
+        if line.startswith(prefix):
+            value = line.strip().split("=", 1)[1]
+            if value:
+                return value
+    raise SystemExit(f"{name} missing or empty in .env")
+
+
+def get_password():
+    return get_env_value("ADMIN_PASSWORD")
+
+
+DNS_SERVER = get_env_value("PIHOLE_IP")
 
 def req(method, path, body=None):
     global SID, CSRF
@@ -64,7 +74,7 @@ def dig_status(domain):
     """Returns (status, blocked, detail).
     Pi-hole's default blocking mode (ip_addr) answers NOERROR + 0.0.0.0/
     :: instead of NXDOMAIN, so 'blocked' is true for both modes."""
-    out = subprocess.run(["dig", "+time=3", "+tries=2", "@127.0.0.1", domain],
+    out = subprocess.run(["dig", "+time=3", "+tries=2", "@" + DNS_SERVER, domain],
                          capture_output=True, text=True).stdout
     m = re.search(r"status:\s*(\w+)", out)
     status = m.group(1) if m else "?"

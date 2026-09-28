@@ -17,6 +17,10 @@
 # - Config/state persists in ./etc-pihole (git-ignored).
 # - Admin password comes from .env (git-ignored, mode 600) via
 #   FTLCONF_webserver_api_password - the v6 "single source of truth" mechanism.
+# - The top-level project name is path-independent; bootstrap also forces it on
+#   the CLI so an inherited COMPOSE_PROJECT_NAME cannot override deployment.
+
+name: tvguard
 
 services:
   pihole:
@@ -33,11 +37,11 @@ services:
       # interface inside the container (required in bridge mode).
       FTLCONF_dns_listeningMode: ALL
     ports:
-      - "${PIHOLE_BIND_IP:-0.0.0.0}:53:53/tcp"
-      - "${PIHOLE_BIND_IP:-0.0.0.0}:53:53/udp"
-      - "${PIHOLE_BIND_IP:-0.0.0.0}:3001:80/tcp"
+      - "${PIHOLE_BIND_IP:?set PIHOLE_BIND_IP in .env}:53:53/tcp"
+      - "${PIHOLE_BIND_IP:?set PIHOLE_BIND_IP in .env}:53:53/udp"
+      - "${PIHOLE_BIND_IP:?set PIHOLE_BIND_IP in .env}:3001:80/tcp"
       - "127.0.0.1:3001:80/tcp"
-      - "${PIHOLE_BIND_IP:-0.0.0.0}:3443:443/tcp"
+      - "${PIHOLE_BIND_IP:?set PIHOLE_BIND_IP in .env}:3443:443/tcp"
     volumes:
       - ./etc-pihole:/etc/pihole
     restart: unless-stopped

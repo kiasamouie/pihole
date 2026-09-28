@@ -177,11 +177,12 @@ PYEOF
 
   echo
   echo "=== TV path + keeps ($V) ==="
-  V="$V" RES="$ROOT/data/privacy-policy/resolved.json" LAN_PREFIX="$LAN_PREFIX" python3 - <<'PYEOF'
+  V="$V" RES="$ROOT/data/privacy-policy/resolved.json" LAN_PREFIX="$LAN_PREFIX" PIHOLE_DNS="$PIHOLE_IP" python3 - <<'PYEOF'
 import json, os, re, subprocess, sys
 ROOT = os.environ["RES"]
 d = json.load(open(ROOT))
 v = os.environ["V"]
+PIHOLE_DNS = os.environ["PIHOLE_DNS"]
 vs = d["vendors"][v]
 lan = os.environ.get("LAN_PREFIX", "")
 for ip in vs.get("applies_to", []):
@@ -196,7 +197,7 @@ for ip in vs.get("applies_to", []):
 import subprocess
 keepd = vs.get("keep", {}).get("domains", [])[:6]
 for k in keepd:
-    out = subprocess.run(["dig", "+short", "+time=5", "+tries=2", "@127.0.0.1", k],
+    out = subprocess.run(["dig", "+short", "+time=5", "+tries=2", "@" + PIHOLE_DNS, k],
                          capture_output=True, text=True).stdout.strip()
     # scan ALL lines: the first line is often a CNAME, the A record follows it
     ip = next((ln for ln in out.splitlines() if re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", ln)), "")

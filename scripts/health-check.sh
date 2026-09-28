@@ -17,7 +17,7 @@ STATE_DIR=/var/lib/tvguard
 . "$SCRIPT_DIR/_tvguard_env.sh" || exit 4
 
 : "${MODE:=}" "${LAN_INTERFACE:=}" "${LAN_SUBNET:=}" "${GATEWAY_IP:=}"
-: "${PIHOLE_IP:=}" "${UPSTREAM_ROUTER:=}" "${WAN_INTERFACE:=}" "${TVS:=}"
+: "${PIHOLE_IP:=}" "${PIHOLE_BIND_IP:=}" "${UPSTREAM_ROUTER:=}" "${WAN_INTERFACE:=}" "${TVS:=}"
 
 fail=0
 say(){ printf "%-58s %s\n" "$1" "$2"; }
@@ -37,7 +37,7 @@ run_root() {
 }
 
 missing=""
-for name in MODE LAN_INTERFACE LAN_SUBNET GATEWAY_IP PIHOLE_IP UPSTREAM_ROUTER TVS; do
+for name in MODE LAN_INTERFACE LAN_SUBNET GATEWAY_IP PIHOLE_IP PIHOLE_BIND_IP UPSTREAM_ROUTER TVS; do
     [ -n "${!name:-}" ] || missing="$missing${missing:+, }$name"
 done
 if [ "$MODE" = "dualnic-gateway" ] && [ -z "$WAN_INTERFACE" ]; then
@@ -55,26 +55,35 @@ esac
 
 if command -v python3 >/dev/null 2>&1 && \
    CONFIG_LAN="$LAN_SUBNET" CONFIG_GW="$GATEWAY_IP" CONFIG_PH="$PIHOLE_IP" \
-   CONFIG_UPSTREAM="$UPSTREAM_ROUTER" CONFIG_TVS="$TVS" python3 - <<'PY' >/dev/null 2>&1
+   CONFIG_BIND="$PIHOLE_BIND_IP" CONFIG_UPSTREAM="$UPSTREAM_ROUTER" \
+   CONFIG_TVS="$TVS" python3 - <<'PY' >/dev/null 2>&1
 import ipaddress
 import os
 
 lan = ipaddress.ip_network(os.environ["CONFIG_LAN"], strict=False)
-for key in ("CONFIG_GW", "CONFIG_PH", "CONFIG_UPSTREAM"):
-    ipaddress.ip_address(os.environ[key])
+values = {}
+for key in ("CONFIG_GW", "CONFIG_PH", "CONFIG_BIND", "CONFIG_UPSTREAM"):
+    values[key] = ipaddress.IPv4Address(os.environ[key])
 for value in os.environ["CONFIG_TVS"].split():
-    ipaddress.ip_address(value)
+    ipaddress.IPv4Address(value)
 if not os.environ["CONFIG_TVS"].split():
     raise ValueError("TVS is empty")
-if ipaddress.ip_address(os.environ["CONFIG_GW"]) not in lan:
+if values["CONFIG_GW"] not in lan:
     raise ValueError("GATEWAY_IP is outside LAN_SUBNET")
-if ipaddress.ip_address(os.environ["CONFIG_PH"]) not in lan:
+if values["CONFIG_PH"] not in lan:
     raise ValueError("PIHOLE_IP is outside LAN_SUBNET")
+if values["CONFIG_BIND"] != values["CONFIG_PH"]:
+    raise ValueError("PIHOLE_BIND_IP must equal PIHOLE_IP")
+if values["CONFIG_BIND"] in (lan.network_address, lan.broadcast_address):
+    raise ValueError("PIHOLE_BIND_IP is not a usable LAN host address")
+if values["CONFIG_BIND"].is_unspecified or values["CONFIG_BIND"].is_loopback \
+        or values["CONFIG_BIND"].is_link_local or values["CONFIG_BIND"].is_multicast:
+    raise ValueError("PIHOLE_BIND_IP is not a concrete LAN address")
 PY
 then
     pass "machine config network values" "$LAN_SUBNET via $LAN_INTERFACE"
 else
-    fail_check "tvguard.conf network values" "invalid IPv4 address/subnet or empty TVS"
+    fail_check "machine config network values" "invalid IPv4 address/subnet or empty TVS"
 fi
 
 echo "=== prerequisites ==="
@@ -98,9 +107,9 @@ if command -v ip >/dev/null 2>&1; then
     ip -4 -o addr show | awk '{print $4}' | cut -d/ -f1 | grep -Fxq "$GATEWAY_IP" \
         && pass "configured gateway address $GATEWAY_IP" "assigned on host" \
         || fail_check "configured gateway address $GATEWAY_IP" "not assigned on host"
-    ip -4 -o addr show | awk '{print $4}' | cut -d/ -f1 | grep -Fxq "$PIHOLE_IP" \
-        && pass "configured Pi-hole bind $PIHOLE_IP" "assigned on host" \
-        || fail_check "configured Pi-hole bind $PIHOLE_IP" "not assigned on host"
+    ip -4 -o addr show dev "$LAN_INTERFACE" | awk '{print $4}' | cut -d/ -f1 | grep -Fxq "$PIHOLE_BIND_IP" \
+        && pass "configured Pi-hole bind $PIHOLE_BIND_IP" "assigned on $LAN_INTERFACE" \
+        || fail_check "configured Pi-hole bind $PIHOLE_BIND_IP" "not assigned on $LAN_INTERFACE"
     if ip -6 route show default 2>/dev/null | grep -q .; then
         fail_check "IPv6 default route" "present; privacy policy has an uncontrolled IPv6 path"
     else
@@ -118,16 +127,77 @@ if command -v docker >/dev/null 2>&1; then
     else
         fail_check "pihole container" "state=${pihole_state:-missing}, health=${pihole_health:-n/a}"
     fi
+
+    pihole_project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' pihole 2>/dev/null || true)
+    [ "$pihole_project" = "tvguard" ] \
+        && pass "Pi-hole Compose project" "tvguard (path-independent)" \
+        || fail_check "Pi-hole Compose project" "${pihole_project:-missing}; rerun sudo ./bootstrap.sh"
+    pihole_restart=$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' pihole 2>/dev/null || true)
+    case "$pihole_restart" in
+        always|unless-stopped) pass "Pi-hole restart policy" "$pihole_restart" ;;
+        *) fail_check "Pi-hole restart policy" "${pihole_restart:-missing}" ;;
+    esac
+
+    if docker inspect pihole 2>/dev/null | EXPECTED_BIND="$PIHOLE_BIND_IP" python3 -c '
+import json, os, sys
+container = json.load(sys.stdin)[0]
+bind = os.environ["EXPECTED_BIND"]
+actual = {
+    port: {(row.get("HostIp", ""), row.get("HostPort", "")) for row in (rows or [])}
+    for port, rows in (container.get("HostConfig", {}).get("PortBindings") or {}).items()
+}
+expected = {
+    "53/tcp": {(bind, "53")},
+    "53/udp": {(bind, "53")},
+    "80/tcp": {(bind, "3001"), ("127.0.0.1", "3001")},
+    "443/tcp": {(bind, "3443")},
+}
+if actual != expected:
+    raise SystemExit(1)
+' >/dev/null 2>&1; then
+        pass "Pi-hole published-port binds" "$PIHOLE_BIND_IP (LAN) + admin loopback"
+    else
+        fail_check "Pi-hole published-port binds" "unexpected or wildcard bind"
+    fi
+
+    expected_pihole_mount=$(readlink -f "$ROOT/etc-pihole")
+    pihole_mount=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/pihole"}}{{.Source}}{{end}}{{end}}' pihole 2>/dev/null || true)
+    pihole_mount_canon=$(readlink -f "$pihole_mount" 2>/dev/null || true)
+    if [ -n "$pihole_mount_canon" ] && [ "$pihole_mount_canon" = "$expected_pihole_mount" ]; then
+        pass "Pi-hole persisted-data mount" "$expected_pihole_mount"
+    else
+        fail_check "Pi-hole persisted-data mount" "expected $expected_pihole_mount, got ${pihole_mount:-missing}"
+    fi
+
+    if docker exec pihole test -r /etc/pihole/gravity.db 2>/dev/null; then
+        pass "Pi-hole gravity database" "mounted and readable"
+    else
+        fail_check "Pi-hole gravity database" "missing/unreadable inside container"
+    fi
+fi
+if PIHOLE_DB="$ROOT/etc-pihole/gravity.db" python3 - <<'PYEOF' >/dev/null 2>&1
+import os, sqlite3
+path = os.environ["PIHOLE_DB"]
+con = sqlite3.connect("file:%s?mode=ro" % path, uri=True)
+result = con.execute("PRAGMA quick_check").fetchone()[0]
+con.close()
+if result != "ok":
+    raise SystemExit(result)
+PYEOF
+then
+    pass "Pi-hole gravity database integrity" "ok"
+else
+    fail_check "Pi-hole gravity database integrity" "quick_check failed"
 fi
 if command -v dig >/dev/null 2>&1; then
-    dig +time=3 +tries=2 "@$PIHOLE_IP" example.com >/dev/null 2>&1 \
-        && pass "dig @$PIHOLE_IP example.com" "NOERROR" \
-        || fail_check "dig @$PIHOLE_IP example.com" "no DNS answer"
+    dig +time=3 +tries=2 "@$PIHOLE_BIND_IP" example.com >/dev/null 2>&1 \
+        && pass "dig @$PIHOLE_BIND_IP example.com" "NOERROR" \
+        || fail_check "dig @$PIHOLE_BIND_IP example.com" "no DNS answer"
 fi
 if command -v curl >/dev/null 2>&1; then
-    curl -fsS --max-time 5 -o /dev/null "http://$PIHOLE_IP:3001/admin/" \
-        && pass "Pi-hole web/API bind" "http://$PIHOLE_IP:3001" \
-        || fail_check "Pi-hole web/API bind" "http://$PIHOLE_IP:3001 unavailable"
+    curl -fsS --max-time 5 -o /dev/null "http://$PIHOLE_BIND_IP:3001/admin/" \
+        && pass "Pi-hole web/API bind" "http://$PIHOLE_BIND_IP:3001" \
+        || fail_check "Pi-hole web/API bind" "http://$PIHOLE_BIND_IP:3001 unavailable"
 fi
 
 echo
@@ -202,14 +272,40 @@ if [ "$active" -eq 1 ]; then
         || fail_check "net.ipv4.conf.$LAN_INTERFACE.send_redirects" "must be 0 while active"
 fi
 
+service_load=$(systemctl show tvguard.service --property=LoadState --value 2>/dev/null || true)
 service_enabled=$(systemctl is-enabled tvguard.service 2>/dev/null || true)
 service_active=$(systemctl is-active tvguard.service 2>/dev/null || true)
-if [ "$service_enabled" = "enabled" ]; then
-    [ "$service_active" = "active" ] \
-        && pass "tvguard.service" "enabled and active" \
-        || fail_check "tvguard.service" "enabled but ${service_active:-inactive}"
+if [ "$service_load" != "loaded" ]; then
+    fail_check "tvguard.service" "not installed or not loadable"
+elif [ "$active" -eq 1 ]; then
+    if [ "$service_enabled" = "enabled" ] && [ "$service_active" = "active" ]; then
+        pass "tvguard.service" "enabled and active"
+    else
+        fail_check "tvguard.service" "TVGuard is active but service is ${service_enabled:-unknown}/${service_active:-unknown}"
+    fi
+elif [ "$service_active" = "active" ]; then
+    fail_check "tvguard.service" "active without TVGuard active marker"
+elif [ "$service_active" = "failed" ]; then
+    fail_check "tvguard.service" "failed while TVGuard is disabled"
 else
-    say "tvguard.service" "${service_enabled:-not-installed} (${service_active:-inactive})"
+    pass "tvguard.service" "installed; TVGuard disabled (${service_enabled:-unknown}/${service_active:-inactive})"
+fi
+
+if [ "$service_load" = "loaded" ]; then
+    unit_text=$(systemctl cat tvguard.service 2>/dev/null || true)
+    unit_start_pre=$(systemctl show tvguard.service --property=ExecStartPre --value 2>/dev/null || true)
+    unit_start=$(systemctl show tvguard.service --property=ExecStart --value 2>/dev/null || true)
+    boot_ready_target=$(readlink -f /usr/local/libexec/tvguard/pihole-boot-ready 2>/dev/null || true)
+    apply_target=$(readlink -f /usr/local/libexec/tvguard/apply 2>/dev/null || true)
+    if printf '%s\n' "$unit_start_pre" | grep -Fq "path=/usr/local/libexec/tvguard/pihole-boot-ready ;" \
+       && printf '%s\n' "$unit_start" | grep -Fq "path=/usr/local/libexec/tvguard/apply ;" \
+       && [ "$boot_ready_target" = "$ROOT/scripts/pihole-boot-ready.sh" ] \
+       && [ "$apply_target" = "$ROOT/scripts/tvguard-apply.sh" ] \
+       && printf '%s\n' "$unit_text" | grep -Fqx "ConditionPathExists=/var/lib/tvguard/active"; then
+        pass "tvguard.service runtime paths" "$ROOT via fixed launchers"
+    else
+        fail_check "tvguard.service runtime paths" "stale/missing; rerun sudo ./bootstrap.sh"
+    fi
 fi
 
 echo

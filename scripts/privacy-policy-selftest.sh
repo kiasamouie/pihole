@@ -531,10 +531,11 @@ print(' '.join(sorted(keep)[:3]))")
     esac
 
     echo "--- Pi-hole group cycle (temp group, mock client $NSIP only) ---"
-    PH_OUT=$(PRIVACY_ROOT="$ROOT" MOCK_CLIENT="$NSIP" VENDOR="$VENDOR" PROF="$PROF" NS="$NS" RES="$RES" python3 - <<'PYEOF'
+    PH_OUT=$(PRIVACY_ROOT="$ROOT" MOCK_CLIENT="$NSIP" VENDOR="$VENDOR" PROF="$PROF" NS="$NS" RES="$RES" PIHOLE_DNS="$PIHOLE_IP" python3 - <<'PYEOF'
 import json, os, re, subprocess, time, urllib.request, urllib.error
 ROOT = os.environ["PRIVACY_ROOT"]; MOCK = os.environ["MOCK_CLIENT"]
 VENDOR = os.environ["VENDOR"]; PROF = os.environ["PROF"]; NS = os.environ["NS"]
+PIHOLE_DNS = os.environ["PIHOLE_DNS"]
 BASE = "http://127.0.0.1:3001"
 GN = "TVGuard-Privacy-TEST-%s" % VENDOR.upper()
 pw = ""
@@ -653,7 +654,7 @@ time.sleep(1)
 
 def host_dig(dom):
     """Baseline answer from THIS host via local Pi-hole (host is not in the group)."""
-    out = subprocess.run(["dig", "+short", "+time=5", "+tries=2", "@127.0.0.1", dom],
+    out = subprocess.run(["dig", "+short", "+time=5", "+tries=2", "@" + PIHOLE_DNS, dom],
                          capture_output=True, text=True).stdout.strip()
     # scan all lines: the first may be a CNAME, the A record follows
     for ln in (out.splitlines() if out else []):

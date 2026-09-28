@@ -25,7 +25,8 @@ need_root() {
   fi
 }
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Machine config (TVGUARD_ENV > $ROOT/.env > legacy config/tvguard.conf).
@@ -85,6 +86,12 @@ TGUARD_TABLE="${TGUARD_TABLE:-tvguard}"
 PRIVACY_STATE_FILE="$STATE_DIR/privacy-state"
 PRIVACY_RESOLVED="$ROOT/data/privacy-policy/resolved.json"
 PRIVACY_VENDOR_ROWS=""
+if grep -Eq '^[[:space:]]*PRIVACY(-[A-Za-z0-9_-]+)?[[:space:]]*=[[:space:]]*(standard|standard-no-voice|strict|manufacturer-lockdown)[[:space:]]*$' \
+     "$PRIVACY_STATE_FILE" 2>/dev/null \
+   && ip -6 route show default 2>/dev/null | grep -q .; then
+  echo "ERROR: active privacy policy not applied: IPv6 default route would bypass IPv4 enforcement" >&2
+  exit 4
+fi
 if [ -f "$PRIVACY_STATE_FILE" ] && [ -f "$PRIVACY_RESOLVED" ] && command -v python3 >/dev/null 2>&1; then
   PRIVACY_VENDOR_ROWS="$(python3 - "$ROOT/config/privacy-instances.yaml" "$PRIVACY_STATE_FILE" "$PRIVACY_RESOLVED" <<'PYEOF' 2>/dev/null
 import json, os, sys

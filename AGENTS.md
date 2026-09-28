@@ -46,11 +46,27 @@ sudo ./bootstrap.sh
 It is idempotent and safe to re-run. It: installs packages, checks port
 conflicts (53, 3001, 3443), generates `.env` (record the password it prints),
 deploys the pinned Pi-hole via `compose.yaml`, runs the Pi-hole self-test and
-provisions the per-device groups, and installs (but does NOT enable) the
-`tvguard.service` unit.
+provisions the per-device groups, and installs `tvguard.service` (disabled on
+a fresh box; an already-enabled installation stays enabled and is restarted
+through fixed launchers that point to the current clone).
 
-If it reports port conflicts, STOP and report them — something else on this
-box owns DNS or the Pi-hole ports. Do not displace it.
+Compose defaults to the path-independent project name `tvguard`, and bootstrap
+forces that name even if `COMPOSE_PROJECT_NAME` is set externally. The service
+runs `scripts/pihole-boot-ready.sh` before loading TVGuard: it starts Pi-hole,
+requires the container to belong to project `tvguard`, requires `/etc/pihole`
+to be bound to this clone's ignored `etc-pihole/`, requires a readable
+`gravity.db`, and waits for health before TVGuard resolves the live container
+IP. Bootstrap and `scripts/health-check.sh` both reject a stale bind or stale
+launcher targets.
+
+If this exact clone is physically moved, run
+`sudo ./bootstrap.sh --migrate-repository-path` from its new location before
+rebooting. This explicit path migration requires the new location's database
+to pass SQLite integrity checking and refuses to overwrite a different database
+at the old mount.
+
+If it reports port conflicts or a different Pi-hole state mount, STOP and
+report them. Something else owns the ports/state; do not displace it.
 
 ### 1.2 Verify the base layer
 
@@ -92,6 +108,7 @@ LAN_INTERFACE=<this box's LAN NIC>
 LAN_SUBNET=<observed subnet>
 GATEWAY_IP=<this box's LAN IP — the IP the TVs will use>
 PIHOLE_IP=<same as GATEWAY_IP>
+PIHOLE_BIND_IP=<same as PIHOLE_IP>
 UPSTREAM_ROUTER=<the router's LAN IP>
 WAN_INTERFACE=               # dualnic-gateway only
 TVS="<TV IPs space-separated>"
@@ -214,7 +231,9 @@ up.
 
 ## 5. Definition of done
 
-- `scripts/health-check.sh` → ALL CHECKS PASSED
+- `scripts/health-check.sh` → ALL CHECKS PASSED, including the Pi-hole state
+  mount/database and current-clone `tvguard.service` paths
+- `scripts/pihole-boot-ready.sh` → Pi-hole healthy on the persisted database
 - `sudo scripts/tvguard-status.sh` → monitor mode, correct TV list, NAT intact
 - `sudo scripts/privacy-policy-selftest.sh all` → ALL PASS
 - `sudo scripts/privacy-live-check.sh` → 0 failed
