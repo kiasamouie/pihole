@@ -1,0 +1,11 @@
+# Local LAN records served by the primary Pi-hole (kiaserver).
+# Format: "<ip> <name>" per line. Applied by scripts/apply-lan-records.sh.
+#
+# The .cable.virginm.net suffixed entries are REQUIRED: the router DHCP
+# option 15 (domain) is cable.virginm.net, so Windows/TV clients query the
+# suffixed form first; without these, single-label names fail on Windows
+# even though the bare name resolves (root cause of the Sep 2026 incident).
+192.168.0.128 kiaserver
+192.168.0.214 kiarender
+192.168.0.128 kiaserver.cable.virginm.net
+192.168.0.214 kiarender.cable.virginm.net
