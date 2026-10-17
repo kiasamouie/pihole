@@ -52,11 +52,12 @@ through fixed launchers that point to the current clone).
 
 Compose defaults to the path-independent project name `tvguard`, and bootstrap
 forces that name even if `COMPOSE_PROJECT_NAME` is set externally. The service
-runs `scripts/pihole-boot-ready.sh` before loading TVGuard: it starts Pi-hole,
-requires the container to belong to project `tvguard`, requires `/etc/pihole`
-to be bound to this clone's ignored `etc-pihole/`, requires a readable
-`gravity.db`, and waits for health before TVGuard resolves the live container
-IP. Bootstrap and `scripts/health-check.sh` both reject a stale bind or stale
+runs `scripts/pihole-boot-ready.sh` before loading TVGuard: it waits for the
+configured LAN address, starts Pi-hole, requires project `tvguard`, this clone's
+persisted `/etc/pihole` mount, a readable `gravity.db`, an IP on
+`tvguard_default`, exact runtime TCP/UDP port 53 publishes, and successful UDP
+and TCP DNS through the configured LAN address. Bootstrap and
+`scripts/health-check.sh` reject stale state, missing endpoints, or stale
 launcher targets.
 
 If this exact clone is physically moved, run
@@ -233,8 +234,11 @@ up.
 
 - `scripts/health-check.sh` → ALL CHECKS PASSED, including the Pi-hole state
   mount/database and current-clone `tvguard.service` paths
-- `scripts/pihole-boot-ready.sh` → Pi-hole healthy on the persisted database
+- `scripts/pihole-boot-ready.sh` → persisted Pi-hole answers UDP/TCP DNS through the configured LAN endpoint
 - `sudo scripts/tvguard-status.sh` → monitor mode, correct TV list, NAT intact
+- `sudo deploy/install-boot-hardening.sh` installed → health-check "boot resilience"
+  section all OK (docker waits for the LAN address; `tvguard-watchdog.timer`
+  enabled; no detached containers). See `docs/BOOT_RESILIENCE.md`.
 - `sudo scripts/privacy-policy-selftest.sh all` → ALL PASS
 - `sudo scripts/privacy-live-check.sh` → 0 failed
 - Samsung policy active exactly as on the proven box (state line

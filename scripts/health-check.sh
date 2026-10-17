@@ -119,6 +119,7 @@ fi
 
 echo
 echo "=== Pi-hole ==="
+pihole_network_ip=""
 if command -v docker >/dev/null 2>&1; then
     pihole_state=$(docker inspect -f '{{.State.Status}}' pihole 2>/dev/null || true)
     pihole_health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' pihole 2>/dev/null || true)
@@ -137,6 +138,13 @@ if command -v docker >/dev/null 2>&1; then
         always|unless-stopped) pass "Pi-hole restart policy" "$pihole_restart" ;;
         *) fail_check "Pi-hole restart policy" "${pihole_restart:-missing}" ;;
     esac
+
+    pihole_network_ip=$(docker inspect -f '{{with index .NetworkSettings.Networks "tvguard_default"}}{{.IPAddress}}{{end}}' pihole 2>/dev/null || true)
+    if [ -n "$pihole_network_ip" ]; then
+        pass "Pi-hole tvguard_default attachment" "$pihole_network_ip"
+    else
+        fail_check "Pi-hole tvguard_default attachment" "missing network or container IP"
+    fi
 
     if docker inspect pihole 2>/dev/null | EXPECTED_BIND="$PIHOLE_BIND_IP" python3 -c '
 import json, os, sys
@@ -158,6 +166,27 @@ if actual != expected:
         pass "Pi-hole published-port binds" "$PIHOLE_BIND_IP (LAN) + admin loopback"
     else
         fail_check "Pi-hole published-port binds" "unexpected or wildcard bind"
+    fi
+
+    if docker inspect pihole 2>/dev/null | EXPECTED_BIND="$PIHOLE_BIND_IP" python3 -c '
+import json, os, sys
+container = json.load(sys.stdin)[0]
+bind = os.environ["EXPECTED_BIND"]
+ports = container.get("NetworkSettings", {}).get("Ports") or {}
+actual = {
+    port: {(row.get("HostIp", ""), row.get("HostPort", "")) for row in (ports.get(port) or [])}
+    for port in ("53/tcp", "53/udp")
+}
+expected = {
+    "53/tcp": {(bind, "53")},
+    "53/udp": {(bind, "53")},
+}
+if actual != expected:
+    raise SystemExit(1)
+' >/dev/null 2>&1; then
+        pass "Pi-hole runtime DNS publishes" "$PIHOLE_BIND_IP:53 tcp+udp"
+    else
+        fail_check "Pi-hole runtime DNS publishes" "missing or wrong-address TCP/UDP endpoint"
     fi
 
     expected_pihole_mount=$(readlink -f "$ROOT/etc-pihole")
@@ -190,9 +219,22 @@ else
     fail_check "Pi-hole gravity database integrity" "quick_check failed"
 fi
 if command -v dig >/dev/null 2>&1; then
-    dig +time=3 +tries=2 "@$PIHOLE_BIND_IP" example.com >/dev/null 2>&1 \
-        && pass "dig @$PIHOLE_BIND_IP example.com" "NOERROR" \
-        || fail_check "dig @$PIHOLE_BIND_IP example.com" "no DNS answer"
+    udp_answer=$(dig +time=2 +tries=1 +short "@$PIHOLE_BIND_IP" pi.hole A 2>/dev/null | sed -n '1p' || true)
+    tcp_answer=$(dig +tcp +time=2 +tries=1 +short "@$PIHOLE_BIND_IP" pi.hole A 2>/dev/null | sed -n '1p' || true)
+    if [ -n "$pihole_network_ip" ] \
+       && [ "$udp_answer" = "$pihole_network_ip" ] \
+       && [ "$tcp_answer" = "$pihole_network_ip" ]; then
+        pass "Pi-hole LAN DNS path (UDP + TCP)" "pi.hole -> $pihole_network_ip"
+    else
+        fail_check "Pi-hole LAN DNS path (UDP + TCP)" "udp=${udp_answer:-none}, tcp=${tcp_answer:-none}, expected=${pihole_network_ip:-none}"
+    fi
+
+    external_dns=$(dig +time=3 +tries=2 "@$PIHOLE_BIND_IP" example.com 2>/dev/null || true)
+    if printf '%s\n' "$external_dns" | grep -q 'status: NOERROR'; then
+        pass "dig @$PIHOLE_BIND_IP example.com" "NOERROR"
+    else
+        fail_check "dig @$PIHOLE_BIND_IP example.com" "no NOERROR response"
+    fi
 fi
 if command -v curl >/dev/null 2>&1; then
     curl -fsS --max-time 5 -o /dev/null "http://$PIHOLE_BIND_IP:3001/admin/" \
@@ -305,6 +347,35 @@ if [ "$service_load" = "loaded" ]; then
         pass "tvguard.service runtime paths" "$ROOT via fixed launchers"
     else
         fail_check "tvguard.service runtime paths" "stale/missing; rerun sudo ./bootstrap.sh"
+    fi
+fi
+
+echo
+echo "=== boot resilience ==="
+if command -v docker >/dev/null 2>&1; then
+    if detached=$("$SCRIPT_DIR/docker-lan-heal.sh" --check 2>&1); then
+        pass "no detached restart-policy containers" "all attached"
+    else
+        fail_check "no detached restart-policy containers" "$(printf '%s' "$detached" | grep -o 'DETACHED: [^ ]*' | paste -sd' ') - run scripts/docker-lan-heal.sh"
+    fi
+fi
+if command -v systemctl >/dev/null 2>&1; then
+    if systemctl show docker.service -p DropInPaths --value 2>/dev/null | grep -q 10-tvguard-lan-address \
+       && [ -x /usr/local/libexec/tvguard/wait-lan-address ]; then
+        pass "docker waits for LAN address" "10-tvguard-lan-address.conf"
+    else
+        fail_check "docker waits for LAN address" "missing; run sudo deploy/install-boot-hardening.sh"
+    fi
+    if systemctl is-enabled --quiet tvguard-watchdog.timer 2>/dev/null \
+       && systemctl is-active --quiet tvguard-watchdog.timer; then
+        wd_result=$(systemctl show tvguard-watchdog.service -p Result --value 2>/dev/null)
+        if [ "$wd_result" = "success" ]; then
+            pass "tvguard-watchdog.timer" "enabled, last run success"
+        else
+            fail_check "tvguard-watchdog.timer" "last run: ${wd_result:-unknown} (journalctl -u tvguard-watchdog)"
+        fi
+    else
+        fail_check "tvguard-watchdog.timer" "not enabled; run sudo deploy/install-boot-hardening.sh"
     fi
 fi
 

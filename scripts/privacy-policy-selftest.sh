@@ -86,7 +86,7 @@ if v not in (d.get("vendors") or {}):
 PYEOF
 done
 
-CIP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' pihole 2>/dev/null | awk 'NF' | head -1)
+CIP=$(docker inspect -f '{{with index .NetworkSettings.Networks "tvguard_default"}}{{.IPAddress}}{{end}}' pihole 2>/dev/null)
 [ -n "$CIP" ] || { echo "cannot resolve pihole container IP"; exit 1; }
 echo "pihole container IP: $CIP"
 echo "vendors to test: $VENDORS"

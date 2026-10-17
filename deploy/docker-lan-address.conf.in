@@ -1,0 +1,12 @@
+# docker.service drop-in installed by deploy/install-boot-hardening.sh.
+# Do not start dockerd (which restores containers publishing ports on the LAN
+# address) until DHCP has assigned that address. Bounded and non-fatal ("-"):
+# Docker always starts; leftovers are repaired by docker-lan-heal / watchdog.
+[Unit]
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=TVGUARD_LAN_IF=@LAN_INTERFACE@ TVGUARD_LAN_IP=@PIHOLE_BIND_IP@ TVGUARD_LAN_WAIT=90
+ExecStartPre=-/usr/local/libexec/tvguard/wait-lan-address
+ExecStartPost=-/usr/local/libexec/tvguard/docker-lan-heal

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the TVGuard watchdog every 2 minutes
+
+[Timer]
+OnBootSec=90s
+OnUnitInactiveSec=2min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

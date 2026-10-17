@@ -54,6 +54,7 @@ reports/                audits, inventory, visibility, TVGuard design, raw evide
 docs/                   ALL project documentation lives here (17 files)
   docs/ROUTER_NEXT_STEPS_V2.md   your manual steps only (upstream router + Samsung)
   docs/ROLLBACK.md               one-command firewall rollback + full removal
+  docs/BOOT_RESILIENCE.md        2026-10-17 reboot incident: root cause, boot hardening, recovery
   docs/REVIEW_BEFORE_BLOCKING.md human review dataset (destinations by category)
   docs/FINAL_BLOCKING_PLAN.md    what standard / standard-no-voice / strict block, keep, force, leave working
   docs/TV_MANUAL_TEST_CHECKLIST.md  ordered physical TV tests with PASS/FAIL + diagnostics
@@ -91,7 +92,10 @@ scripts/                see below
 | `scripts/make-env.sh` | create `.env` with a strong random admin password | fresh machine |
 | `scripts/setup-pihole-groups.py` | idempotent per-device groups + client registration | python3 |
 | `scripts/pihole-selftest.py` | local end-to-end Pi-hole test (login, block, allow, query log) | python3 |
-| `scripts/pihole-boot-ready.sh` | boot gate: correct state mount + readable database + healthy Pi-hole | systemd/root |
+| `scripts/pihole-boot-ready.sh` | boot gate: host bind address + persisted state + exact Docker network/ports + UDP/TCP LAN DNS | systemd/root |
+| `scripts/docker-lan-heal.sh` | re-attach containers Docker 29 left network-less after a boot-time LAN bind failure (`--check` = report only) | docker group/root |
+| `scripts/tvguard-watchdog.sh` | 2-minute timer: heal detached containers, Pi-hole LAN DNS, re-apply TVGuard if failed/stale | systemd/root |
+| `deploy/install-boot-hardening.sh` | install docker LAN-address drop-in + watchdog timer (`--uninstall` rolls back); see `docs/BOOT_RESILIENCE.md` | sudo |
 | `scripts/discover-lan.sh` | re-run passive LAN discovery, refresh inventory | sudo |
 | `scripts/capture-device.sh` | passive per-device tcpdump (headers, not payloads) | sudo |
 | `scripts/show-dns-activity.py` | per-client DNS activity from the Pi-hole API | python3 |
@@ -141,11 +145,12 @@ bootstrap forces that name even if the calling environment sets a conflicting
 remains in this clone's ignored `etc-pihole/`. Bootstrap atomically installs
 `deploy/tvguard.service.in` and points its fixed launchers at the current clone,
 including clone paths containing shell/systemd-special characters. On every
-service start, `scripts/pihole-boot-ready.sh` starts Pi-hole, rejects a stale project or
-`/etc/pihole` bind mount, requires a readable `gravity.db`, waits for container
-health, then lets TVGuard resolve the live container IP and load its rules.
-`scripts/health-check.sh` independently checks the persisted mount/database,
-actual published-port binds, restart policy, and installed launcher targets.
+service start, `scripts/pihole-boot-ready.sh` waits for the configured LAN bind,
+starts Pi-hole, rejects a stale project or `/etc/pihole` bind mount, and requires
+its readable `gravity.db`, exact `tvguard_default` attachment, runtime TCP/UDP 53
+publishes, and successful UDP/TCP `pi.hole` queries through the LAN address before
+TVGuard can load rules. `scripts/health-check.sh` independently checks the same
+runtime DNS path, persisted state, restart policy, and installed launcher targets.
 
 If this exact clone is physically moved, run
 `sudo ./bootstrap.sh --migrate-repository-path` from the new location before

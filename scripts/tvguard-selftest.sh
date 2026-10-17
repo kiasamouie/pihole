@@ -78,7 +78,7 @@ sleep 1
 
 echo "=== loading throwaway table ip tvguard-test (mirrors production) ==="
 # Mirror production: resolve the pihole container IP for the DNS-bypass DNAT.
-CIP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' pihole 2>/dev/null | awk 'NF' | head -1)
+CIP=$(docker inspect -f '{{with index .NetworkSettings.Networks "tvguard_default"}}{{.IPAddress}}{{end}}' pihole 2>/dev/null)
 if [ -z "$CIP" ]; then no "could not resolve pihole container IP for the DNS test"; exit 1; fi
 echo "  pihole container IP: $CIP"
 cat > "$STATE_DIR/tvguard-test.nft" <<EOF

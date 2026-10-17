@@ -1,0 +1,10 @@
+[Unit]
+Description=TVGuard watchdog (detached containers, Pi-hole LAN DNS, TVGuard rules)
+After=docker.service tvguard.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+Environment=TVGUARD_LAN_IP=@PIHOLE_BIND_IP@
+ExecStart=/usr/local/libexec/tvguard/watchdog
+TimeoutStartSec=300

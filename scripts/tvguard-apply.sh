@@ -144,7 +144,7 @@ PRIVACY_SUMMARY=""
 # comment). Empty => render falls back to `redirect`.
 PIHOLE_CONTAINER_IP=""
 if command -v docker >/dev/null 2>&1; then
-  PIHOLE_CONTAINER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' pihole 2>/dev/null | awk 'NF' | head -1)
+  PIHOLE_CONTAINER_IP=$(docker inspect -f '{{with index .NetworkSettings.Networks "tvguard_default"}}{{.IPAddress}}{{end}}' pihole 2>/dev/null)
   [ -n "$PIHOLE_CONTAINER_IP" ] || echo "WARN: could not resolve pihole container IP; DNS bypass will use redirect fallback" >&2
 fi
 

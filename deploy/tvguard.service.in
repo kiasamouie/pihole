@@ -15,7 +15,8 @@ ConditionPathExists=/var/lib/tvguard/active
 Type=oneshot
 RemainAfterExit=yes
 # Refuse to load against a missing database or a container bound to a stale
-# repository path. The bounded gate starts Pi-hole and waits up to 60 seconds.
+# repository path. The bounded gate re-attaches a Pi-hole that Docker left
+# detached (docker-lan-heal) and proves the complete LAN DNS endpoint.
 ExecStartPre=/usr/local/libexec/tvguard/pihole-boot-ready
 # Re-applies the mode recorded in the state file (monitor/enforce). Idempotent.
 # (No ExecStop: disabling is done explicitly via scripts/tvguard-disable.sh to
