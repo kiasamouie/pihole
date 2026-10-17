@@ -143,6 +143,29 @@ The DHCP reservation for kiaserver (192.168.0.128) on the router is required.
 If kiaserver ever gets a different IP, the published ports, the TV gateway and
 the router port-forwards all break.
 
-## Test results
+## Test log (2026-10-17)
 
-See the "Test log" section at the end of this file (filled in on 2026-10-17).
+| test | result | evidence |
+|---|---|---|
+| Failure mode reproduced (throwaway containers) | PASS | failed port bind -> next `docker start` = running, `Networks {}`; stop/start/restart do not recover; `network connect` does |
+| `docker-lan-heal` on live system | PASS | healed `pihole` + `kiaplatform-platform-tls`; second run `detached=0` |
+| heal regression test (throwaway) | PASS | running-detached and exited-bind-error both healed with Compose alias; intentionally stopped container untouched |
+| Pi-hole LAN DNS UDP+TCP | PASS | `pi.hole -> 172.21.0.2`, `example.com` NOERROR via 192.168.0.128 |
+| Pi-hole admin (public) | PASS | https://kiaserver.ddns.net/pihole/admin/ login 200, all 24 assets 200 (after Caddy `/admin/*` redirect restore) |
+| Kia Platform (public) | PASS | https://kiaserver.ddns.net/platform -> /platform/login 200 |
+| Plex / Samba / Transmission | PASS (reachability) | :32400/identity 200, :445 open, :9091 open |
+| boot gate (`pihole-boot-ready`) | PASS | ready in 0.35 s on healthy system |
+| installer | PASS | backup 20261017-195908; drop-in loaded; timer enabled; tvguard re-applied; watchdog OK |
+| `health-check.sh` | PASS | ALL CHECKS PASSED incl. boot-resilience section (nft/UFW rows WARN: need root) |
+| Pi-hole container restart | PASS | DNS back in 1 s, same IP 172.21.0.2 |
+| **fault injection**: live Pi-hole detached (`network disconnect`), no manual action | PASS | watchdog auto-recovered in 71 s, same IP, tvguard active |
+| TV routed through Pi-hole + Samsung policy | PASS | TV 192.168.0.197 in groups TV-Monitor + TVGuard-Privacy; since restore blocked samsungacr (ACR), aibixby (voice), samsungads, netflix logs; YouTube/googlevideo/Amazon resolving |
+| non-TV isolation | PASS | aibixby/samsungcloud.tv/samsungads resolve normally for a non-TV client; KiaPC sent 0 queries since restore |
+| nft table contents, privacy-live-check, UFW route rules, conntrack | NOT TESTED | require root (no passwordless sudo in the agent session); service active + state `MODE=monitor` |
+| docker daemon restart | NOT TESTED | would bounce Kia Platform/invoice; covered by the reboot test |
+| full reboot | NOT TESTED | awaiting owner-run reboot; then run `scripts/health-check.sh` and `sudo scripts/privacy-live-check.sh` |
+
+Second, separate fault found today: the public Pi-hole admin rendered
+unstyled since 2026-10-13 20:29, because the last Caddyfile edit that day
+removed `handle /admin/* { redir .../pihole{uri} 308 }`. Restored in
+kiaplatform commit 37e2c17.
